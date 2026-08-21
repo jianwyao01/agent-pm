@@ -17,7 +17,7 @@ import type { Candidate, EvidenceRecord } from "./types.js";
 
 /**
  * 四接口。M1 实现 SourceProvider（git + local；archive 接口保留未交付）。
- * M2 实现 ProjectAdapter.detect / createRunPlan；start / stop 接口保留未交付。
+ * M2 实现 ProjectAdapter.detect / createRunPlan；M3 实现 start / stop。
  * boot / discovery 只消费 Workspace + SourceSnapshot，不得依赖 source.kind。
  * 替换 AgentRunner 时，Source / Project / Discovery / Export 代码无需改动。
  */
@@ -30,12 +30,11 @@ export interface ProjectAdapter {
   detect(workspace: Workspace): Promise<ProjectProfile>;
   createRunPlan(workspace: Workspace, profile: ProjectProfile): Promise<RunPlan>;
   /**
-   * 接口保留。M2 实现必须返回 not_shipped（implementation not shipped），
-   * 不得表现为「系统没有 start」。M3 才实现启动。
-   * 将来只读取 confirmation.status === "confirmed" 的 run-plan.yaml。
+   * 只读取 confirmation.status === "confirmed" 的 run-plan.yaml。
+   * 未确认或未信任的目标不得安装或执行目标脚本。
    */
   start(workspace: Workspace, plan: RunPlan): Promise<StartResult>;
-  /** 接口保留，实现未交付（not_shipped），同 Source.archive。 */
+  /** 仅拆除本工具启动的组件，依据 running-project.json。 */
   stop(project: RunningProject): Promise<StopResult>;
 }
 

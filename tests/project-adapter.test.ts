@@ -137,7 +137,7 @@ describe("M2 ProjectAdapter", () => {
     expect(() => assertPlanConfirmed(confirmed)).not.toThrow();
   });
 
-  it("start/stop 接口存在，实现未交付，而不是「系统没有 start」", async () => {
+  it("start/stop 接口存在，draft plan 不得当作 success", async () => {
     const adapter = new DefaultProjectAdapter();
     expect(typeof adapter.start).toBe("function");
     expect(typeof adapter.stop).toBe("function");
@@ -150,25 +150,9 @@ describe("M2 ProjectAdapter", () => {
       components: [],
       confirmation: { status: "draft" }
     });
-    expect(started.status).toBe("not_shipped");
-    if (started.status !== "not_shipped") {
-      throw new Error("expected not_shipped");
-    }
-    expect(started.message).toMatch(/implementation not shipped/i);
-    expect(started.message).not.toMatch(/system has no start/i);
-    expect(started.message).not.toMatch(/unsupported/i);
-    expect("running_project" in started).toBe(false);
-
-    const stopped = await adapter.stop({
-      schema_version: SCHEMA_VERSION,
-      usable_for_explore: true,
-      base_url: "https://example.test"
-    });
-    expect(stopped.status).toBe("not_shipped");
-    if (stopped.status !== "not_shipped") {
-      throw new Error("expected not_shipped");
-    }
-    expect(stopped.message).toMatch(/implementation not shipped/i);
+    expect(started.status).toBe("failed-runtime");
+    expect("project" in started).toBe(false);
+    expect(started.gaps.some((gap) => gap.reason === "plan_not_confirmed")).toBe(true);
   });
 
   it("run-plan.yaml 出现 password: 明文则 schema/校验失败", () => {
