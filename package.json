@@ -3,12 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "行为地图 M0：通用产品行为分析合约、Mock Agent 与导出（非产品适配器）",
+  "description": "行为地图：通用产品行为分析器（M0 合约 + M1 Source 快照）",
   "license": "MIT",
   "workspaces": [
     "packages/contracts",
     "packages/agent",
-    "packages/export"
+    "packages/export",
+    "packages/source"
   ],
   "scripts": {
     "test": "vitest run && tsc --noEmit -p tsconfig.json",

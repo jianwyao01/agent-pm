@@ -7,9 +7,11 @@
   "required": ["schema_version", "kind", "locator", "revision", "snapshot"],
   "properties": {
     "schema_version": { "const": "0.1.0" },
-    "kind": { "enum": ["fixture", "git", "archive", "local"] },
+    "kind": { "enum": ["git", "local", "archive"] },
     "locator": { "type": "string", "minLength": 1 },
     "revision": { "type": "string", "minLength": 1 },
-    "snapshot": { "type": "string", "minLength": 1 }
+    "snapshot": { "type": "string", "minLength": 1 },
+    "dirty": { "type": "boolean" },
+    "content_digest": { "type": "string", "minLength": 1 }
   }
 }

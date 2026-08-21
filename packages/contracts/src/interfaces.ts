@@ -8,20 +8,21 @@ import type {
   RunContext,
   RunPlan,
   Scope,
-  Snapshot,
-  SourceDescriptor,
+  SourcePrepareResult,
+  SourceRequest,
   StartResult,
   Workspace
 } from "./types.js";
 import type { Candidate, EvidenceRecord } from "./types.js";
 
 /**
- * 四接口仅类型。M0 除 MockAgentRunner 外不提供真实实现。
- * 替换 AgentRunner 实现时，Source / Project / Discovery / Export 代码无需改动。
+ * 四接口。M1 实现 SourceProvider（git + local；archive 接口保留未交付）。
+ * boot / discovery 只消费 Workspace + SourceSnapshot，不得依赖 source.kind。
+ * 替换 AgentRunner 时，Source / Project / Discovery / Export 代码无需改动。
  */
 
 export interface SourceProvider {
-  prepare(source: SourceDescriptor): Promise<{ workspace: Workspace; snapshot: Snapshot }>;
+  prepare(source: SourceRequest): Promise<SourcePrepareResult>;
 }
 
 export interface ProjectAdapter {
