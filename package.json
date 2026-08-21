@@ -11,7 +11,7 @@
     "packages/export"
   ],
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run && tsc --noEmit -p tsconfig.json",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

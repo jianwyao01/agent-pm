@@ -1,28 +1,16 @@
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-import Ajv, { type ErrorObject, type ValidateFunction } from "ajv";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import Ajv from "ajv";
+import type { ErrorObject, ValidateFunction } from "ajv";
 import addFormats from "ajv-formats";
 import { readJson, readJsonl, readYaml } from "./io.js";
 
-import studySchema from "./schemas/study.schema.json" with { type: "json" };
-import probePlanSchema from "./schemas/probe-plan.schema.json" with { type: "json" };
-import sourceSchema from "./schemas/source.schema.json" with { type: "json" };
-import projectProfileSchema from "./schemas/project-profile.schema.json" with { type: "json" };
-import runPlanSchema from "./schemas/run-plan.schema.json" with { type: "json" };
-import runContextSchema from "./schemas/run-context.schema.json" with { type: "json" };
-import statusSchema from "./schemas/status.schema.json" with { type: "json" };
-import runningProjectSchema from "./schemas/running-project.schema.json" with { type: "json" };
-import evidenceSchema from "./schemas/evidence.schema.json" with { type: "json" };
-import candidateSchema from "./schemas/candidate.schema.json" with { type: "json" };
-import proposalSchema from "./schemas/proposal.schema.json" with { type: "json" };
-import diffSchema from "./schemas/diff.schema.json" with { type: "json" };
-import capabilitiesSchema from "./schemas/capabilities.schema.json" with { type: "json" };
-import journeysSchema from "./schemas/journeys.schema.json" with { type: "json" };
-import effectsSchema from "./schemas/effects.schema.json" with { type: "json" };
-import reviewDecisionsSchema from "./schemas/review-decisions.schema.json" with { type: "json" };
-import productMapSchema from "./schemas/product-map.schema.json" with { type: "json" };
-import exportManifestSchema from "./schemas/export-manifest.schema.json" with { type: "json" };
-import agentTaskSchema from "./schemas/agent-task.schema.json" with { type: "json" };
+const schemaDir = join(dirname(fileURLToPath(import.meta.url)), "schemas");
+
+function loadSchema(name: string): object {
+  return JSON.parse(readFileSync(join(schemaDir, name), "utf8")) as object;
+}
 
 export type FileKind =
   | "study"
@@ -46,25 +34,25 @@ export type FileKind =
   | "agent-task";
 
 const SCHEMAS: Record<FileKind, object> = {
-  study: studySchema,
-  "probe-plan": probePlanSchema,
-  source: sourceSchema,
-  "project-profile": projectProfileSchema,
-  "run-plan": runPlanSchema,
-  "run-context": runContextSchema,
-  status: statusSchema,
-  "running-project": runningProjectSchema,
-  evidence: evidenceSchema,
-  candidate: candidateSchema,
-  proposal: proposalSchema,
-  diff: diffSchema,
-  capabilities: capabilitiesSchema,
-  journeys: journeysSchema,
-  effects: effectsSchema,
-  "review-decisions": reviewDecisionsSchema,
-  "product-map": productMapSchema,
-  "export-manifest": exportManifestSchema,
-  "agent-task": agentTaskSchema
+  study: loadSchema("study.schema.json"),
+  "probe-plan": loadSchema("probe-plan.schema.json"),
+  source: loadSchema("source.schema.json"),
+  "project-profile": loadSchema("project-profile.schema.json"),
+  "run-plan": loadSchema("run-plan.schema.json"),
+  "run-context": loadSchema("run-context.schema.json"),
+  status: loadSchema("status.schema.json"),
+  "running-project": loadSchema("running-project.schema.json"),
+  evidence: loadSchema("evidence.schema.json"),
+  candidate: loadSchema("candidate.schema.json"),
+  proposal: loadSchema("proposal.schema.json"),
+  diff: loadSchema("diff.schema.json"),
+  capabilities: loadSchema("capabilities.schema.json"),
+  journeys: loadSchema("journeys.schema.json"),
+  effects: loadSchema("effects.schema.json"),
+  "review-decisions": loadSchema("review-decisions.schema.json"),
+  "product-map": loadSchema("product-map.schema.json"),
+  "export-manifest": loadSchema("export-manifest.schema.json"),
+  "agent-task": loadSchema("agent-task.schema.json")
 };
 
 export interface StructuralIssue {
@@ -93,9 +81,19 @@ const PLAINTEXT_SECRET_KEYS = new Set([
 
 const REF_KEYS = new Set(["secret_ref", "credential_ref", "cookie_ref"]);
 
-function createAjv(): Ajv {
-  const ajv = new Ajv({ allErrors: true, strict: false });
-  addFormats(ajv);
+type AjvLike = {
+  compile: (schema: object) => ValidateFunction;
+};
+
+function createAjv(): AjvLike {
+  const Ctor =
+    (Ajv as unknown as { default?: new (opts?: object) => AjvLike }).default ??
+    (Ajv as unknown as new (opts?: object) => AjvLike);
+  const ajv = new Ctor({ allErrors: true, strict: false });
+  const formats =
+    (addFormats as unknown as { default?: (instance: AjvLike) => void }).default ??
+    (addFormats as unknown as (instance: AjvLike) => void);
+  formats(ajv);
   return ajv;
 }
 
@@ -103,12 +101,13 @@ const ajv = createAjv();
 const validators = new Map<FileKind, ValidateFunction>();
 
 function validatorFor(kind: FileKind): ValidateFunction {
-  let fn = validators.get(kind);
-  if (!fn) {
-    fn = ajv.compile(SCHEMAS[kind]);
-    validators.set(kind, fn);
+  const cached = validators.get(kind);
+  if (cached) {
+    return cached;
   }
-  return fn;
+  const compiled = ajv.compile(SCHEMAS[kind]);
+  validators.set(kind, compiled);
+  return compiled;
 }
 
 export function listFileKinds(): FileKind[] {
