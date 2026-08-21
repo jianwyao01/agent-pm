@@ -1,0 +1,26 @@
+{
+  "$id": "https://behavior-map.dev/schemas/journeys.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "journeys",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "journeys"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "journeys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "status", "effect_ids"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "status": { "enum": ["accepted", "stale", "not_observed"] },
+          "effect_ids": { "type": "array", "items": { "type": "string" } },
+          "control_id": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$id": "https://behavior-map.dev/schemas/common.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "common",
+  "definitions": {
+    "schema_version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "string_list": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

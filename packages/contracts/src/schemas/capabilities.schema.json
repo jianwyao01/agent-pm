@@ -1,0 +1,24 @@
+{
+  "$id": "https://behavior-map.dev/schemas/capabilities.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "capabilities",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "capabilities"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "control_ids"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "control_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

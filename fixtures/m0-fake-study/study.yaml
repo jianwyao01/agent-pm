@@ -1,0 +1,12 @@
+schema_version: "0.1.0"
+id: study-m0-inbox
+name: 协作收件箱发送
+goal: 映射一次发送动作在本面、他面、列表与后台的可观察效果
+entry_seeds:
+  - composer
+include_hints:
+  - send
+  - inbox
+exclude_hints:
+  - admin
+exploration_mode: approved_probe

@@ -1,0 +1,27 @@
+{
+  "name": "behavior-map",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "行为地图 M0：通用产品行为分析合约、Mock Agent 与导出（非产品适配器）",
+  "license": "MIT",
+  "workspaces": [
+    "packages/contracts",
+    "packages/agent",
+    "packages/export"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.13.10",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "js-yaml": "^4.1.0",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  }
+}

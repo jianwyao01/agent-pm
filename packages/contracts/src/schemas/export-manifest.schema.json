@@ -1,0 +1,13 @@
+{
+  "$id": "https://behavior-map.dev/schemas/export-manifest.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "export-manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "journey_ids"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "kind": { "enum": ["product-map", "diagrams", "web", "tests"] },
+    "journey_ids": { "type": "array", "items": { "type": "string" } }
+  }
+}

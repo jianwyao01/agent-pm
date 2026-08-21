@@ -1,0 +1,63 @@
+{
+  "$id": "https://behavior-map.dev/schemas/proposal.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "task_id",
+    "run_id",
+    "inputs",
+    "proposed_journeys",
+    "proposed_effects"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "run_id": { "type": "string", "minLength": 1 },
+    "inputs": { "type": "array", "items": { "type": "string" } },
+    "proposed_journeys": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "candidate_ids", "effect_candidate_ids"],
+        "properties": {
+          "name": { "type": "string" },
+          "candidate_ids": { "type": "array", "items": { "type": "string" } },
+          "effect_candidate_ids": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "proposed_effects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "candidate_id", "observation_kind", "observed"],
+        "properties": {
+          "name": { "type": "string" },
+          "candidate_id": { "type": "string" },
+          "observation_kind": {
+            "enum": [
+              "current_surface",
+              "other_surface",
+              "collection",
+              "indicator",
+              "notification",
+              "backend_operation"
+            ]
+          },
+          "subtype": { "type": "string" },
+          "transport": {
+            "enum": ["http", "websocket", "rpc", "event", "database", "unknown"]
+          },
+          "observed": { "type": "boolean" }
+        }
+      }
+    }
+  }
+}

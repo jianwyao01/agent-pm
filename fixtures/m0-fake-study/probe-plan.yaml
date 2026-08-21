@@ -1,0 +1,9 @@
+schema_version: "0.1.0"
+human_approved: true
+entry: composer
+session_slot: primary
+target_surface: surface-composer
+send_action: control-send
+other_surfaces_to_refresh:
+  - surface-peer-inbox
+  - surface-thread-list

@@ -1,0 +1,23 @@
+{
+  "$id": "https://behavior-map.dev/schemas/diff.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "diff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_run_id",
+    "current_run_id",
+    "comparison_mode",
+    "study_id",
+    "scope_id"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "baseline_run_id": { "type": "string", "minLength": 1 },
+    "current_run_id": { "type": "string", "minLength": 1 },
+    "comparison_mode": { "enum": ["same_snapshot", "changed_snapshot"] },
+    "study_id": { "type": "string", "minLength": 1 },
+    "scope_id": { "type": "string", "minLength": 1 }
+  }
+}

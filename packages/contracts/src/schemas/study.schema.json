@@ -1,0 +1,27 @@
+{
+  "$id": "https://behavior-map.dev/schemas/study.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "study",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "name",
+    "goal",
+    "entry_seeds",
+    "include_hints",
+    "exclude_hints",
+    "exploration_mode"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "goal": { "type": "string", "minLength": 1 },
+    "entry_seeds": { "type": "array", "items": { "type": "string" } },
+    "include_hints": { "type": "array", "items": { "type": "string" } },
+    "exclude_hints": { "type": "array", "items": { "type": "string" } },
+    "exploration_mode": { "const": "approved_probe" }
+  }
+}
