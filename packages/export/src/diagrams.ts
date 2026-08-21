@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { type ReviewedModel, writeText } from "@behavior-map/contracts";
+import { DISPLAY_COLUMNS, type ReviewedModel, writeText } from "@behavior-map/contracts";
 import { journeyIdsOf, writeManifest } from "./shared.js";
 
 export function generateDiagrams(model: ReviewedModel, generatedRoot: string): string {
@@ -7,13 +7,17 @@ export function generateDiagrams(model: ReviewedModel, generatedRoot: string): s
   const lines = [
     "```mermaid",
     "flowchart LR",
-    "  actor[Actor] --> control[SendControl]",
-    "  control --> current[CurrentSurface]",
-    "  control --> other[OtherSurface]",
-    "  control --> backend[BackendOperation]"
+    "  actor[操作者] --> control[SendControl]"
   ];
+  for (const column of DISPLAY_COLUMNS) {
+    const nodeId = safe(column.observation_kind);
+    lines.push(`  control --> ${nodeId}["${column.label}"]`);
+  }
   for (const journey of model.journeys) {
     lines.push(`  control --> ${safe(journey.id)}["${escapeLabel(journey.name)}\\n${journey.id}"]`);
+    for (const column of DISPLAY_COLUMNS) {
+      lines.push(`  ${safe(journey.id)} --> ${safe(column.observation_kind)}`);
+    }
   }
   lines.push("```", "");
   const mermaid = `${lines.join("\n")}\n`;

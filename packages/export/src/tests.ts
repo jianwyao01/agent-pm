@@ -29,7 +29,8 @@ test('${journey.id}: ${escapeTs(journey.name)}', async ({ page }) => {
 
   const spec = `import { test } from '@playwright/test';
 
-// 由 reviewed model 生成。本文件可被 Playwright 发现，但 M0 不运行、不报告通过。
+// 由 reviewed model 生成。本文件可被 Playwright 发现。
+// 这是草稿：不运行目标应用，也不报告成功。
 
 ${blocks.join("\n\n")}
 `;

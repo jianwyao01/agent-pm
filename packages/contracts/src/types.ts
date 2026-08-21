@@ -361,6 +361,21 @@ export interface Proposal {
   proposed_run_plan?: RunPlan;
 }
 
+export type DiffBaselineSource = "previous_completed" | "explicit" | "self";
+
+export interface DiffProposalEntry {
+  task_id: string;
+  proposal_id: string;
+  kind?: AgentTaskKind;
+  proposed_journey_names: string[];
+  proposed_effect_names: string[];
+}
+
+export interface DiffMissingSupport {
+  journey_id: string;
+  status: Exclude<JourneyLifecycle, "accepted">;
+}
+
 export interface DiffFile {
   schema_version: SchemaVersion;
   baseline_run_id: string;
@@ -368,6 +383,11 @@ export interface DiffFile {
   comparison_mode: ComparisonMode;
   study_id: string;
   scope_id: string;
+  /** 缺省 = previous_completed；其它基线只能来自显式参数。 */
+  baseline_source?: DiffBaselineSource;
+  /** 本 run 新写出的提案，供人工对照；不得据此改写 model/。 */
+  new_proposals?: DiffProposalEntry[];
+  missing_support?: DiffMissingSupport[];
 }
 
 export interface Surface {

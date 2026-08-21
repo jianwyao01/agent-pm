@@ -3,7 +3,16 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { readJson, type SourceRecord } from "@behavior-map/contracts";
 
-const SKIP_DIRS = new Set([".git", "node_modules", "dist", "coverage", "runs", ".vitest"]);
+const SKIP_DIRS = new Set([
+  ".git",
+  "node_modules",
+  "dist",
+  "coverage",
+  "runs",
+  "generated",
+  "model",
+  ".vitest"
+]);
 
 export const SCAN_EXTENSIONS = new Set([
   ".html",
