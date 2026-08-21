@@ -277,7 +277,7 @@ export function writeRunArtifacts(
   const runDir = join(analysisRoot, "runs", runId);
   const source: SourceDescriptor = {
     schema_version: SCHEMA_VERSION,
-    kind: "fixture",
+    kind: "local",
     locator: "fixtures/m0-fake-study",
     revision: "fake-rev-1",
     snapshot

@@ -9,8 +9,18 @@ const contractsDir = join(dirname(fileURLToPath(import.meta.url)), "../packages/
 describe("核心类型边界", () => {
   it("contracts 源码不焊接产品域名词", () => {
     const files = ["types.ts", "interfaces.ts", "ids.ts", "display.ts"];
+    expect(readFileSync(join(contractsDir, "types.ts"), "utf8")).toMatch(
+      /SourceKind = "git" \| "local" \| "archive"/
+    );
     for (const file of files) {
       const text = readFileSync(join(contractsDir, file), "utf8");
+      expect(text).not.toMatch(/Rocket\.Chat/);
+      expect(text).not.toMatch(/\bRoom\b/);
+      expect(text).not.toMatch(/\bChannel\b/);
+    }
+    const sourceDir = join(dirname(fileURLToPath(import.meta.url)), "../packages/source/src");
+    for (const file of ["provider.ts", "record.ts", "locator.ts"]) {
+      const text = readFileSync(join(sourceDir, file), "utf8");
       expect(text).not.toMatch(/Rocket\.Chat/);
       expect(text).not.toMatch(/\bRoom\b/);
       expect(text).not.toMatch(/\bChannel\b/);

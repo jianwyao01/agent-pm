@@ -1,0 +1,12 @@
+{
+  "name": "@behavior-map/source",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@behavior-map/contracts": "*"
+  }
+}

@@ -24,6 +24,20 @@ describe("JSON Schema 结构校验", () => {
     }
   });
 
+  it("source.json 拒绝 scope 与 host-specific kind", () => {
+    const base = {
+      schema_version: "0.1.0",
+      kind: "git",
+      locator: "https://example.test/sample.git",
+      revision: "abc",
+      snapshot: "abc"
+    };
+    expect(validateDocument("source", base).ok).toBe(true);
+    expect(validateDocument("source", { ...base, scope: "inbox" }).ok).toBe(false);
+    expect(validateDocument("source", { ...base, kind: "github" }).ok).toBe(false);
+    expect(validateDocument("source", { ...base, kind: "fixture" }).ok).toBe(false);
+  });
+
   it("拒绝缺少 schema_version 的文档", () => {
     const report = validateDocument("study", {
       id: "x",

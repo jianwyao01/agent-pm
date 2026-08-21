@@ -56,14 +56,58 @@ export interface ProbePlan {
   other_surfaces_to_refresh: string[];
 }
 
-/** Source 只描述本次分析用到的材料，不含业务范围、也不含长期绝对身份。 */
-export interface SourceDescriptor {
+/** Source 种类。GitHub/GitLab 只是 git 宿主，不是核心类型。 */
+export type SourceKind = "git" | "local" | "archive";
+
+/** 交给 SourceProvider.prepare 的输入。revision 为可选 ref 提示。 */
+export interface SourceRequest {
+  schema_version?: SchemaVersion;
+  kind: SourceKind;
+  locator: string;
+  revision?: string;
+}
+
+/**
+ * 写入 source.json 的记录。
+ * 不含业务范围，不以绝对路径作为长期身份，也没有 host-specific 类型。
+ */
+export interface SourceRecord {
   schema_version: SchemaVersion;
-  kind: "fixture" | "git" | "archive" | "local";
+  kind: SourceKind;
   locator: string;
   revision: string;
   snapshot: string;
+  dirty?: boolean;
+  content_digest?: string;
 }
+
+/** @deprecated 使用 SourceRecord（落盘）或 SourceRequest（prepare 输入） */
+export type SourceDescriptor = SourceRecord;
+
+/**
+ * 下游（boot / discovery）只消费此快照，不得依赖 source.kind。
+ * id：git / 含提交的 local 为 commit；非 git local 为 content_digest。
+ */
+export interface SourceSnapshot {
+  id: string;
+  revision: string;
+  dirty?: boolean;
+  content_digest?: string;
+}
+
+export type SourcePrepareReady = {
+  status: "ready";
+  workspace: Workspace;
+  snapshot: SourceSnapshot;
+};
+
+export type SourcePrepareNotShipped = {
+  status: "not_shipped";
+  kind: "archive";
+  message: string;
+};
+
+export type SourcePrepareResult = SourcePrepareReady | SourcePrepareNotShipped;
 
 export interface ProjectProfile {
   schema_version: SchemaVersion;
@@ -268,9 +312,8 @@ export interface Workspace {
   read_only: boolean;
 }
 
-export interface Snapshot {
-  id: string;
-}
+/** 兼容别名：下游请使用 SourceSnapshot。 */
+export type Snapshot = SourceSnapshot;
 
 export interface Scope {
   id: string;
