@@ -49,10 +49,11 @@ function resolveRunId(plan: RunPlan): string {
  * Agent 写在 proposals/ 或 agent-scratch/ 的提案计划一律忽略。
  */
 export function officialStartPlanFiles(workspace: Workspace, plan: RunPlan): string[] {
-  return [
+  const candidates = [
     plan.run_id ? join(workspace.path, "runs", plan.run_id, "run-plan.yaml") : undefined,
     join(workspace.path, "run-plan.yaml")
-  ].filter((file): file is string => Boolean(file) && !isAgentProposalPath(file));
+  ].filter((file): file is string => typeof file === "string");
+  return candidates.filter((file) => !isAgentProposalPath(file));
 }
 
 export function loadStartPlan(workspace: Workspace, plan: RunPlan): RunPlan {
