@@ -440,7 +440,45 @@ export interface Scope {
   id: string;
   include_hints: string[];
   exclude_hints: string[];
+  /** study.yaml 的 entry_seeds；范围提示，不是核心里的硬编码业务词。 */
+  entry_seeds?: string[];
 }
+
+export type DiscoveryStatus = "success" | "partial" | "failed" | "refused";
+
+export interface StaticDiscoveryResult {
+  status: "success" | "partial";
+  candidates: Candidate[];
+  evidence: EvidenceRecord[];
+  gaps: Gap[];
+}
+
+export interface RuntimeDiscoveryResult {
+  status: DiscoveryStatus;
+  candidates: Candidate[];
+  evidence: EvidenceRecord[];
+  observations: Observation[];
+  gaps: Gap[];
+}
+
+export const CROSS_ACTOR_UNEXECUTED = "跨行动者未执行" as const;
+
+export interface CrossActorSlot {
+  executed: false;
+  display_value: typeof CROSS_ACTOR_UNEXECUTED;
+}
+
+export interface ActionObservation {
+  status: DiscoveryStatus;
+  observations: Observation[];
+  evidence: EvidenceRecord[];
+  candidates: Candidate[];
+  gaps: Gap[];
+  cross_actor: CrossActorSlot;
+}
+
+/** explore / execute 只在 start status === success 时使用 RunningProject。 */
+export type DiscoveryProjectInput = RunningProject | StartResult;
 
 export interface AgentPolicy {
   inherit_host_credentials: false;

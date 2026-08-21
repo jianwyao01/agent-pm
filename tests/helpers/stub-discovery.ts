@@ -1,36 +1,50 @@
 import type {
+  ActionObservation,
   Control,
   DiscoveryAdapter,
-  ProbePlan,
-  RunningProject,
+  DiscoveryProjectInput,
+  RunContext,
+  RuntimeDiscoveryResult,
   Scope,
+  StaticDiscoveryResult,
   Workspace
 } from "@behavior-map/contracts";
-import type { Candidate, EvidenceRecord } from "@behavior-map/contracts";
+import { CROSS_ACTOR_UNEXECUTED } from "@behavior-map/contracts";
 
 /**
- * scan 占位：可在 start 失败后仍被调用。
- * 不是真实 Discovery；explore / execute 未交付。
+ * 接口占位。M4 真实实现见 @behavior-map/discovery。
  */
 export class StubDiscoveryAdapter implements DiscoveryAdapter {
-  async scan(
-    _workspace: Workspace,
-    _scope: Scope
-  ): Promise<{ candidates: Candidate[]; evidence: EvidenceRecord[] }> {
-    return { candidates: [], evidence: [] };
+  async scan(_workspace: Workspace, _scope: Scope): Promise<StaticDiscoveryResult> {
+    return { status: "success", candidates: [], evidence: [], gaps: [] };
   }
 
   async explore(
-    _running: RunningProject,
-    _plan: ProbePlan
-  ): Promise<{ candidates: Candidate[]; evidence: EvidenceRecord[] }> {
-    throw new Error("Discovery.explore is not shipped");
+    _project: DiscoveryProjectInput,
+    _context: RunContext,
+    _scope: Scope
+  ): Promise<RuntimeDiscoveryResult> {
+    return {
+      status: "refused",
+      candidates: [],
+      evidence: [],
+      observations: [],
+      gaps: [{ reason: "stub", message: "use DefaultDiscoveryAdapter" }]
+    };
   }
 
   async execute(
-    _running: RunningProject,
+    _project: DiscoveryProjectInput,
+    _context: RunContext,
     _action: Control
-  ): Promise<{ candidates: Candidate[]; evidence: EvidenceRecord[] }> {
-    throw new Error("Discovery.execute is not shipped");
+  ): Promise<ActionObservation> {
+    return {
+      status: "refused",
+      observations: [],
+      evidence: [],
+      candidates: [],
+      gaps: [{ reason: "stub", message: "use DefaultDiscoveryAdapter" }],
+      cross_actor: { executed: false, display_value: CROSS_ACTOR_UNEXECUTED }
+    };
   }
 }

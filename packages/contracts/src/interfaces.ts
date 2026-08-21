@@ -1,23 +1,27 @@
 import type {
+  ActionObservation,
   AgentResult,
   AgentTask,
   Control,
-  ProbePlan,
+  DiscoveryProjectInput,
   ProjectProfile,
   RunningProject,
+  RunContext,
   RunPlan,
+  RuntimeDiscoveryResult,
   Scope,
   SourcePrepareResult,
   SourceRequest,
   StartResult,
+  StaticDiscoveryResult,
   StopResult,
   Workspace
 } from "./types.js";
-import type { Candidate, EvidenceRecord } from "./types.js";
 
 /**
  * 四接口。M1 实现 SourceProvider（git + local；archive 接口保留未交付）。
  * M2 实现 ProjectAdapter.detect / createRunPlan；M3 实现 start / stop。
+ * M4 实现 DiscoveryAdapter.scan / explore / execute。
  * boot / discovery 只消费 Workspace + SourceSnapshot，不得依赖 source.kind。
  * 替换 AgentRunner 时，Source / Project / Discovery / Export 代码无需改动。
  */
@@ -39,19 +43,26 @@ export interface ProjectAdapter {
 }
 
 export interface DiscoveryAdapter {
-  /** scan 只依赖 workspace + scope，不依赖 StartResult。 */
-  scan(
-    workspace: Workspace,
-    scope: Scope
-  ): Promise<{ candidates: Candidate[]; evidence: EvidenceRecord[] }>;
+  /** scan 只依赖 workspace + scope，不依赖 StartResult 或 RunningProject。 */
+  scan(workspace: Workspace, scope: Scope): Promise<StaticDiscoveryResult>;
+  /**
+   * 仅当 start status === success 时使用 RunningProject。
+   * 传入非 success 的 StartResult 必须拒绝。
+   */
   explore(
-    running: RunningProject,
-    plan: ProbePlan
-  ): Promise<{ candidates: Candidate[]; evidence: EvidenceRecord[] }>;
+    project: DiscoveryProjectInput,
+    context: RunContext,
+    scope: Scope
+  ): Promise<RuntimeDiscoveryResult>;
+  /**
+   * 仅当 start status === success 时使用 RunningProject。
+   * 真实发送只由人类确认的 probe-plan.yaml 驱动。
+   */
   execute(
-    running: RunningProject,
+    project: DiscoveryProjectInput,
+    context: RunContext,
     action: Control
-  ): Promise<{ candidates: Candidate[]; evidence: EvidenceRecord[] }>;
+  ): Promise<ActionObservation>;
 }
 
 export interface AgentRunner {

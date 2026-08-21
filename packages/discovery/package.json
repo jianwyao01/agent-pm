@@ -1,0 +1,13 @@
+{
+  "name": "@behavior-map/discovery",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@behavior-map/contracts": "*",
+    "playwright-core": "^1.55.0"
+  }
+}

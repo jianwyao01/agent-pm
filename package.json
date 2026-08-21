@@ -3,14 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "行为地图：通用产品行为分析器（M0 合约 + M1 Source 快照 + M2 detect/plan + M3 start/stop）",
+  "description": "行为地图：通用产品行为分析器（M0–M4：合约、Source、detect/plan、start/stop、Discovery）",
   "license": "MIT",
   "workspaces": [
     "packages/contracts",
     "packages/agent",
     "packages/export",
     "packages/source",
-    "packages/project"
+    "packages/project",
+    "packages/discovery"
   ],
   "scripts": {
     "test": "vitest run && tsc --noEmit -p tsconfig.json",
