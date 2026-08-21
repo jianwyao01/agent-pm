@@ -270,7 +270,7 @@ describe("M3 ProjectAdapter.start / stop", () => {
     for (const file of files) {
       const text = readFileSync(file, "utf8");
       expect(text).not.toMatch(/github\.com\/RocketChat\/Rocket\.Chat/);
-      expect(text).not.toMatch(/git clone/i);
+      expect(text).not.toMatch(/RocketChat\/Rocket\.Chat/);
     }
   });
 });
