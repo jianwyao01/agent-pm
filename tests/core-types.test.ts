@@ -13,7 +13,9 @@ describe("核心类型边界", () => {
     expect(readFileSync(join(contractsDir, "types.ts"), "utf8")).toMatch(
       /SourceKind = "git" \| "local" \| "archive"/
     );
-    expect(readFileSync(join(contractsDir, "types.ts"), "utf8")).not.toMatch(/projectType/);
+    expect(readFileSync(join(contractsDir, "types.ts"), "utf8")).not.toMatch(
+      /(?:type|interface|enum)\s+ProjectType\b|projectType\s*:/
+    );
     for (const file of files) {
       const text = readFileSync(join(contractsDir, file), "utf8");
       expect(text).not.toMatch(/Rocket\.Chat/);

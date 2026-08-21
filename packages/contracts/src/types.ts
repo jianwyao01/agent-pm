@@ -128,7 +128,7 @@ export interface HowToRunClue {
 
 /**
  * 工作区画像。主键是 faces / parts / frameworks / how_to_run 线索，
- * 不是单一 projectType 枚举。
+ * 不是单一项目类型枚举。
  */
 export interface ProjectProfile {
   schema_version: SchemaVersion;
