@@ -35,6 +35,15 @@ export type JourneyLifecycle = "accepted" | "stale" | "not_observed";
 export type NetworkPolicy = "denied_or_explicit";
 export type WorkspaceMode = "read_only";
 
+/** M5 真实 Agent 仅允许这四种事后分析任务，禁止 guide / action / explore。 */
+export const AGENT_TASK_KINDS = [
+  "classify_features",
+  "build_journeys",
+  "analyze_effects",
+  "prune_candidates"
+] as const;
+export type AgentTaskKind = (typeof AGENT_TASK_KINDS)[number];
+
 export interface Study {
   schema_version: SchemaVersion;
   id: string;
@@ -310,6 +319,8 @@ export interface ProposedJourney {
   name: string;
   candidate_ids: string[];
   effect_candidate_ids: string[];
+  evidence_refs?: string[];
+  explanation?: string;
 }
 
 export interface ProposedEffect {
@@ -319,6 +330,20 @@ export interface ProposedEffect {
   subtype?: string;
   transport?: Transport;
   observed: boolean;
+  evidence_refs?: string[];
+  explanation?: string;
+}
+
+export interface ProposedFeature {
+  name: string;
+  candidate_ids: string[];
+  evidence_refs: string[];
+  explanation: string;
+}
+
+export interface PrunedItem {
+  candidate_id: string;
+  reason: string;
 }
 
 export interface Proposal {
@@ -327,8 +352,13 @@ export interface Proposal {
   task_id: string;
   run_id: string;
   inputs: string[];
+  kind?: AgentTaskKind;
+  proposed_features?: ProposedFeature[];
   proposed_journeys: ProposedJourney[];
   proposed_effects: ProposedEffect[];
+  pruned?: PrunedItem[];
+  /** 仅可出现在 proposals/ 或 agent-scratch/；start() 永不读取。 */
+  proposed_run_plan?: RunPlan;
 }
 
 export interface DiffFile {
@@ -494,6 +524,10 @@ export interface AgentTask {
   analysis_root: string;
   approved_read_paths: string[];
   policy: AgentPolicy;
+  /** 真实 runner 必填；Mock 可省略。 */
+  kind?: AgentTaskKind;
+  /** 必填；超时后只能 partial/failed，不得改 model/。 */
+  timeout_ms: number;
 }
 
 export interface AgentResult {

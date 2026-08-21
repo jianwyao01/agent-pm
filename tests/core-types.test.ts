@@ -48,6 +48,14 @@ describe("核心类型边界", () => {
       expect(text).not.toMatch(/\bRoom\b/);
       expect(text).not.toMatch(/\bChannel\b/);
     }
+    const agentDir = join(dirname(fileURLToPath(import.meta.url)), "../packages/agent/src");
+    for (const file of readdirSync(agentDir).filter((name) => name.endsWith(".ts"))) {
+      const text = readFileSync(join(agentDir, file), "utf8");
+      expect(text).not.toMatch(/Rocket\.Chat/);
+      expect(text).not.toMatch(/RocketChat/);
+      expect(text).not.toMatch(/\bRoom\b/);
+      expect(text).not.toMatch(/\bChannel\b/);
+    }
   });
 
   it("只有 success 的 StartResult 带有 explore 可用的 RunningProject", () => {

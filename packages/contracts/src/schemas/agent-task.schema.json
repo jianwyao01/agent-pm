@@ -10,7 +10,8 @@
     "run_id",
     "analysis_root",
     "approved_read_paths",
-    "policy"
+    "policy",
+    "timeout_ms"
   ],
   "properties": {
     "schema_version": { "const": "0.1.0" },
@@ -18,6 +19,10 @@
     "run_id": { "type": "string" },
     "analysis_root": { "type": "string" },
     "approved_read_paths": { "type": "array", "items": { "type": "string" } },
+    "kind": {
+      "enum": ["classify_features", "build_journeys", "analyze_effects", "prune_candidates"]
+    },
+    "timeout_ms": { "type": "integer", "minimum": 1 },
     "policy": {
       "type": "object",
       "additionalProperties": false,

@@ -9,6 +9,7 @@ import type {
   Proposal,
   StatusFile
 } from "./types.js";
+import { countChineseSentences } from "./explanation.js";
 
 export interface SemanticIssue {
   code: string;
@@ -120,12 +121,101 @@ export function validateSemantics(analysisRoot: string): SemanticReport {
     }
   }
 
+  const candidatesById = new Map(collectCandidates(analysisRoot).map((row) => [row.id, row]));
+
   for (const { file, proposal } of collectProposals(analysisRoot)) {
     for (const input of proposal.inputs) {
       if (isGeneratedPath(input)) {
         issues.push({
           code: "generated_is_not_input",
           message: `generated/ 不得作为输入: ${input}`,
+          path: file
+        });
+      }
+    }
+
+    const candidateIds = [
+      ...(proposal.proposed_features ?? []).flatMap((item) => item.candidate_ids),
+      ...proposal.proposed_journeys.flatMap((item) => [
+        ...item.candidate_ids,
+        ...item.effect_candidate_ids
+      ]),
+      ...proposal.proposed_effects.map((item) => item.candidate_id),
+      ...(proposal.pruned ?? []).map((item) => item.candidate_id)
+    ];
+    for (const id of candidateIds) {
+      if (!candidatesById.has(id)) {
+        issues.push({
+          code: "missing_candidate_ref",
+          message: `proposal 引用了不存在的 candidate ${id}`,
+          path: file
+        });
+      }
+    }
+
+    const proposalEvidence = [
+      ...(proposal.proposed_features ?? []).flatMap((item) => item.evidence_refs ?? []),
+      ...proposal.proposed_journeys.flatMap((item) => item.evidence_refs ?? []),
+      ...proposal.proposed_effects.flatMap((item) => item.evidence_refs ?? [])
+    ];
+    checkRefs(proposalEvidence, file);
+
+    for (const feature of proposal.proposed_features ?? []) {
+      if (feature.evidence_refs.length === 0) {
+        issues.push({
+          code: "missing_evidence_ref",
+          message: `无证据边被拒绝: 功能 ${feature.name}`,
+          path: file
+        });
+      }
+      if (feature.explanation && countChineseSentences(feature.explanation) < 3) {
+        issues.push({
+          code: "thin_explanation",
+          message: `保留项说明不足三句: ${feature.name}`,
+          path: file
+        });
+      }
+    }
+
+    for (const journey of proposal.proposed_journeys) {
+      if (journey.evidence_refs && journey.evidence_refs.length === 0) {
+        issues.push({
+          code: "missing_evidence_ref",
+          message: `无证据边被拒绝: 旅程 ${journey.name}`,
+          path: file
+        });
+      }
+      if (journey.explanation && countChineseSentences(journey.explanation) < 3) {
+        issues.push({
+          code: "thin_explanation",
+          message: `保留项说明不足三句: ${journey.name}`,
+          path: file
+        });
+      }
+    }
+
+    for (const effect of proposal.proposed_effects) {
+      if (effect.evidence_refs && effect.evidence_refs.length === 0) {
+        issues.push({
+          code: "missing_evidence_ref",
+          message: `无证据边被拒绝: 效果 ${effect.name}`,
+          path: file
+        });
+      }
+      if (effect.explanation && countChineseSentences(effect.explanation) < 3) {
+        issues.push({
+          code: "thin_explanation",
+          message: `保留项说明不足三句: ${effect.name}`,
+          path: file
+        });
+      }
+    }
+
+    for (const pruned of proposal.pruned ?? []) {
+      if (!pruned.reason.trim()) {
+        issues.push({
+          code: "missing_prune_reason",
+          message: `剪枝项缺少原因: ${pruned.candidate_id}`,
           path: file
         });
       }

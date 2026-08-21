@@ -19,6 +19,23 @@
     "task_id": { "type": "string", "minLength": 1 },
     "run_id": { "type": "string", "minLength": 1 },
     "inputs": { "type": "array", "items": { "type": "string" } },
+    "kind": {
+      "enum": ["classify_features", "build_journeys", "analyze_effects", "prune_candidates"]
+    },
+    "proposed_features": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "candidate_ids", "evidence_refs", "explanation"],
+        "properties": {
+          "name": { "type": "string" },
+          "candidate_ids": { "type": "array", "items": { "type": "string" } },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "explanation": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "proposed_journeys": {
       "type": "array",
       "items": {
@@ -28,7 +45,9 @@
         "properties": {
           "name": { "type": "string" },
           "candidate_ids": { "type": "array", "items": { "type": "string" } },
-          "effect_candidate_ids": { "type": "array", "items": { "type": "string" } }
+          "effect_candidate_ids": { "type": "array", "items": { "type": "string" } },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "explanation": { "type": "string" }
         }
       }
     },
@@ -55,9 +74,24 @@
           "transport": {
             "enum": ["http", "websocket", "rpc", "event", "database", "unknown"]
           },
-          "observed": { "type": "boolean" }
+          "observed": { "type": "boolean" },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "explanation": { "type": "string" }
         }
       }
-    }
+    },
+    "pruned": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["candidate_id", "reason"],
+        "properties": {
+          "candidate_id": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "proposed_run_plan": { "type": "object" }
   }
 }
