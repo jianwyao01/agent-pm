@@ -1,5 +1,16 @@
 import type { RunPlan } from "./types.js";
 
+/** start() 只读官方 run-plan.yaml，永不读取 Agent 提案目录。 */
+export function isAgentProposalPath(value: string): boolean {
+  const normalized = value.replaceAll("\\", "/");
+  return (
+    normalized.includes("/proposals/") ||
+    normalized.includes("/agent-scratch/") ||
+    normalized.endsWith("/proposals") ||
+    normalized.endsWith("/agent-scratch")
+  );
+}
+
 export interface RunPlanIssue {
   code: string;
   message: string;

@@ -8,3 +8,4 @@ export * from "./display.js";
 export * from "./lifecycle.js";
 export * from "./run-plan.js";
 export * from "./scope.js";
+export * from "./explanation.js";

@@ -8,7 +8,6 @@ import {
   type Candidate,
   type Proposal,
   SCHEMA_VERSION,
-  isGeneratedPath,
   proposalIdForTask,
   readJsonl,
   snapshotModelFiles,
@@ -16,17 +15,15 @@ import {
   writeJson,
   writeText
 } from "@behavior-map/contracts";
+import { assertAgentTrustPolicy, assertApprovedReads, requireApprovedRead } from "./policy.js";
+import { isAllowedAgentWritePath } from "./write-paths.js";
 
-export function isAllowedAgentWritePath(runId: string, taskId: string, relativePath: string): boolean {
-  const normalized = relativePath.replaceAll("\\", "/");
-  const proposal = `runs/${runId}/proposals/${taskId}.json`;
-  const scratchPrefix = `runs/${runId}/agent-scratch/`;
-  return normalized === proposal || normalized === scratchPrefix || normalized.startsWith(scratchPrefix);
-}
+export { isAllowedAgentWritePath, assertAllowedAgentWritePath } from "./write-paths.js";
 
 /**
- * M0 唯一的 AgentRunner 实现。
- * 后续真实 runner 只需实现同一接口；Source / Project / Discovery / Export 不依赖本类。
+ * M0 合约测试用的 AgentRunner。
+ * 不是第二套引擎；真实分析由 DefaultAgentRunner 承担。
+ * 替换实现时 Source / Project / Discovery / Export 不必改动。
  */
 export class MockAgentRunner implements AgentRunner {
   readonly inherit_host_credentials = false as const;
@@ -38,8 +35,11 @@ export class MockAgentRunner implements AgentRunner {
   async run(task: AgentTask): Promise<AgentResult> {
     const modelBefore = snapshotModelFiles(task.analysis_root);
     try {
-      this.assertPolicy(task);
-      this.assertApprovedReads(task);
+      assertAgentTrustPolicy(task);
+      assertApprovedReads(task);
+      if (task.task_id === "force-fail") {
+        throw new Error("模拟失败：force-fail");
+      }
       const proposal = this.buildProposal(task);
       const relativeProposal = `runs/${task.run_id}/proposals/${task.task_id}.json`;
       const relativeScratch = `runs/${task.run_id}/agent-scratch/${task.task_id}.log`;
@@ -83,45 +83,9 @@ export class MockAgentRunner implements AgentRunner {
     }
   }
 
-  private assertPolicy(task: AgentTask): void {
-    const { policy } = task;
-    if (policy.inherit_host_credentials !== false) {
-      throw new Error("inherit_host_credentials 必须为 false");
-    }
-    if (policy.load_project_agent_config !== false) {
-      throw new Error("load_project_agent_config 必须为 false");
-    }
-    if (policy.workspace !== "read_only") {
-      throw new Error("workspace 必须为 read_only");
-    }
-    if (policy.network !== "denied_or_explicit") {
-      throw new Error("network 必须为 denied_or_explicit");
-    }
-    if (task.task_id === "force-fail") {
-      throw new Error("模拟失败：force-fail");
-    }
-  }
-
-  private assertApprovedReads(task: AgentTask): void {
-    if (task.approved_read_paths.length === 0) {
-      throw new Error("必须声明 approved_read_paths");
-    }
-    for (const rel of task.approved_read_paths) {
-      if (isGeneratedPath(rel)) {
-        throw new Error(`generated/ 不得作为输入: ${rel}`);
-      }
-      if (rel.includes("..")) {
-        throw new Error(`禁止读取越界路径: ${rel}`);
-      }
-    }
-  }
-
   private loadCandidates(task: AgentTask): Candidate[] {
-    const allowed = new Set(task.approved_read_paths.map((p) => p.replaceAll("\\", "/")));
     const candidatesRel = `runs/${task.run_id}/candidates.jsonl`;
-    if (!allowed.has(candidatesRel)) {
-      throw new Error(`未批准读取 ${candidatesRel}`);
-    }
+    requireApprovedRead(task, candidatesRel);
     const file = join(task.analysis_root, candidatesRel);
     if (!existsSync(file)) {
       throw new Error(`缺少 ${candidatesRel}`);

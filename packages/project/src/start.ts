@@ -5,6 +5,7 @@ import {
   SCHEMA_VERSION,
   assertPlanConfirmed,
   ensureDir,
+  isAgentProposalPath,
   readYaml,
   validateDocument,
   validateRunPlanShape,
@@ -43,13 +44,21 @@ function resolveRunId(plan: RunPlan): string {
   return `run-${Date.now().toString(36)}-${randomBytes(3).toString("hex")}`;
 }
 
-export function loadStartPlan(workspace: Workspace, plan: RunPlan): RunPlan {
+/**
+ * start() 只读取官方 run-plan.yaml。
+ * Agent 写在 proposals/ 或 agent-scratch/ 的提案计划一律忽略。
+ */
+export function officialStartPlanFiles(workspace: Workspace, plan: RunPlan): string[] {
   const candidates = [
     plan.run_id ? join(workspace.path, "runs", plan.run_id, "run-plan.yaml") : undefined,
     join(workspace.path, "run-plan.yaml")
-  ].filter((file): file is string => Boolean(file));
-  for (const file of candidates) {
-    if (existsSync(file)) {
+  ].filter((file): file is string => typeof file === "string");
+  return candidates.filter((file) => !isAgentProposalPath(file));
+}
+
+export function loadStartPlan(workspace: Workspace, plan: RunPlan): RunPlan {
+  for (const file of officialStartPlanFiles(workspace, plan)) {
+    if (existsSync(file) && !isAgentProposalPath(file)) {
       return readYaml<RunPlan>(file);
     }
   }

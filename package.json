@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "行为地图：通用产品行为分析器（M0–M4：合约、Source、detect/plan、start/stop、Discovery）",
+  "description": "行为地图：通用产品行为分析器（M0–M5：合约、Source、detect/plan、start/stop、Discovery、真实 AgentRunner）",
   "license": "MIT",
   "workspaces": [
     "packages/contracts",

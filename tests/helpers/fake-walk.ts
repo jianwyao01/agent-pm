@@ -6,6 +6,7 @@ import {
   UNOBSERVED,
   type AgentRunner,
   type AgentTask,
+  type AgentTaskKind,
   type Candidate,
   type Control,
   type DiffFile,
@@ -500,14 +501,21 @@ function attachSurfaces(model: ReviewedModel): ReviewedModel {
   return { ...model, surfaces: SURFACES, controls: CONTROLS };
 }
 
-export function makeAgentTask(analysisRoot: string, runId: string, taskId: string): AgentTask {
+export function makeAgentTask(
+  analysisRoot: string,
+  runId: string,
+  taskId: string,
+  extras?: { kind?: AgentTaskKind; timeout_ms?: number }
+): AgentTask {
   return {
     schema_version: SCHEMA_VERSION,
     task_id: taskId,
     run_id: runId,
     analysis_root: analysisRoot,
     approved_read_paths: approvedReadsForRun(runId),
-    policy: { ...DEFAULT_AGENT_POLICY }
+    policy: { ...DEFAULT_AGENT_POLICY },
+    kind: extras?.kind,
+    timeout_ms: extras?.timeout_ms ?? 30_000
   };
 }
 

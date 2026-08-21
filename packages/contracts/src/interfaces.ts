@@ -22,6 +22,7 @@ import type {
  * 四接口。M1 实现 SourceProvider（git + local；archive 接口保留未交付）。
  * M2 实现 ProjectAdapter.detect / createRunPlan；M3 实现 start / stop。
  * M4 实现 DiscoveryAdapter.scan / explore / execute。
+ * M5 实现真实 AgentRunner（DefaultAgentRunner）；Mock 仍用于合约测试。
  * boot / discovery 只消费 Workspace + SourceSnapshot，不得依赖 source.kind。
  * 替换 AgentRunner 时，Source / Project / Discovery / Export 代码无需改动。
  */
