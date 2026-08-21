@@ -285,8 +285,13 @@ export function writeRunArtifacts(
   writeJson(join(runDir, "source.json"), source);
   writeJson(join(runDir, "project-profile.json"), {
     schema_version: SCHEMA_VERSION,
-    detected_kind: "generic_web",
-    entrypoints: ["composer"],
+    faces: [{ id: "composer", name: "撰写面", clues: ["fake-walk"] }],
+    parts: [
+      { id: "app", role: "app", clues: ["generic_web"] },
+      { id: "database", role: "database", clues: ["fake-walk"] }
+    ],
+    frameworks: [],
+    how_to_run: [],
     notes: "M0 假数据画像，不是产品适配器"
   });
   writeYaml(join(runDir, "run-plan.yaml"), {
@@ -295,7 +300,30 @@ export function writeRunArtifacts(
     study_id: FAKE_STUDY_ID,
     scope_id: FAKE_SCOPE_ID,
     secret_refs: [{ secret_ref: "env:STUDY_CREDENTIAL" }],
-    steps: ["scan", "explore", "execute"]
+    steps: ["scan", "explore", "execute"],
+    components: [
+      {
+        id: "database",
+        role: "database",
+        depends_on: [],
+        install: { command: "not_started" },
+        start_order: 1,
+        healthcheck: { kind: "tcp", port: 27017 },
+        logs: "logs/database.log",
+        seed: { status: "not_done" }
+      },
+      {
+        id: "app",
+        role: "app",
+        depends_on: ["database"],
+        install: { command: "not_started" },
+        start_order: 2,
+        healthcheck: { kind: "http", url: "https://example.test/health" },
+        logs: "logs/app.log",
+        seed: { status: "not_done" }
+      }
+    ],
+    confirmation: { status: "confirmed", confirmed_at: "2026-01-01T00:00:00.000Z" }
   });
   writeYaml(join(runDir, "run-context.yaml"), {
     schema_version: SCHEMA_VERSION,

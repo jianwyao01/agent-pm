@@ -4,11 +4,48 @@
   "title": "project-profile",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "detected_kind", "entrypoints"],
+  "required": ["schema_version", "faces", "parts", "frameworks", "how_to_run"],
   "properties": {
     "schema_version": { "const": "0.1.0" },
-    "detected_kind": { "type": "string", "minLength": 1 },
-    "entrypoints": { "type": "array", "items": { "type": "string" } },
+    "faces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "clues": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "parts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "role"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "role": { "type": "string", "minLength": 1 },
+          "clues": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "frameworks": { "type": "array", "items": { "type": "string" } },
+    "how_to_run": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "hint"],
+        "properties": {
+          "source": { "type": "string", "minLength": 1 },
+          "hint": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "notes": { "type": "string" }
   }
 }

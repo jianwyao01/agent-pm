@@ -5,13 +5,15 @@ import { describe, expect, it } from "vitest";
 import { markMissingSupport, type StartResult } from "@behavior-map/contracts";
 
 const contractsDir = join(dirname(fileURLToPath(import.meta.url)), "../packages/contracts/src");
+const projectDir = join(dirname(fileURLToPath(import.meta.url)), "../packages/project/src");
 
 describe("核心类型边界", () => {
-  it("contracts 源码不焊接产品域名词", () => {
-    const files = ["types.ts", "interfaces.ts", "ids.ts", "display.ts"];
+  it("contracts 与 project 源码不焊接产品域名词", () => {
+    const files = ["types.ts", "interfaces.ts", "ids.ts", "display.ts", "run-plan.ts"];
     expect(readFileSync(join(contractsDir, "types.ts"), "utf8")).toMatch(
       /SourceKind = "git" \| "local" \| "archive"/
     );
+    expect(readFileSync(join(contractsDir, "types.ts"), "utf8")).not.toMatch(/projectType/);
     for (const file of files) {
       const text = readFileSync(join(contractsDir, file), "utf8");
       expect(text).not.toMatch(/Rocket\.Chat/);
@@ -22,6 +24,13 @@ describe("核心类型边界", () => {
     for (const file of ["provider.ts", "record.ts", "locator.ts"]) {
       const text = readFileSync(join(sourceDir, file), "utf8");
       expect(text).not.toMatch(/Rocket\.Chat/);
+      expect(text).not.toMatch(/\bRoom\b/);
+      expect(text).not.toMatch(/\bChannel\b/);
+    }
+    for (const file of ["adapter.ts", "detect.ts", "plan.ts", "scope.ts", "index.ts"]) {
+      const text = readFileSync(join(projectDir, file), "utf8");
+      expect(text).not.toMatch(/Rocket\.Chat/);
+      expect(text).not.toMatch(/RocketChat/);
       expect(text).not.toMatch(/\bRoom\b/);
       expect(text).not.toMatch(/\bChannel\b/);
     }

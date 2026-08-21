@@ -6,3 +6,4 @@ export * from "./schema-validator.js";
 export * from "./semantic-validator.js";
 export * from "./display.js";
 export * from "./lifecycle.js";
+export * from "./run-plan.js";
