@@ -77,6 +77,29 @@ describe("JSON Schema 结构校验", () => {
       scope_id: "sc",
       secret_refs: [{ secret_ref: "env:X" }],
       steps: [],
+      components: [
+        {
+          id: "database",
+          role: "database",
+          depends_on: [],
+          install: { command: "docker compose up -d mongo" },
+          start_order: 1,
+          healthcheck: { kind: "tcp", port: 27017 },
+          logs: "logs/database.log",
+          seed: { status: "not_done" }
+        },
+        {
+          id: "app",
+          role: "app",
+          depends_on: ["database"],
+          install: { command: "npm install" },
+          start_order: 2,
+          healthcheck: { kind: "http", url: "http://localhost:3000" },
+          logs: "logs/app.log",
+          seed: { status: "not_done" }
+        }
+      ],
+      confirmation: { status: "draft" },
       password: "hunter2"
     });
     expect(report.ok).toBe(false);

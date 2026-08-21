@@ -109,10 +109,33 @@ export type SourcePrepareNotShipped = {
 
 export type SourcePrepareResult = SourcePrepareReady | SourcePrepareNotShipped;
 
+export interface ProfileFace {
+  id: string;
+  name: string;
+  clues?: string[];
+}
+
+export interface ProfilePart {
+  id: string;
+  role: string;
+  clues?: string[];
+}
+
+export interface HowToRunClue {
+  source: string;
+  hint: string;
+}
+
+/**
+ * 工作区画像。主键是 faces / parts / frameworks / how_to_run 线索，
+ * 不是单一项目类型枚举。
+ */
 export interface ProjectProfile {
   schema_version: SchemaVersion;
-  detected_kind: string;
-  entrypoints: string[];
+  faces: ProfileFace[];
+  parts: ProfilePart[];
+  frameworks: string[];
+  how_to_run: HowToRunClue[];
   notes?: string;
 }
 
@@ -120,13 +143,52 @@ export interface SecretRef {
   secret_ref: string;
 }
 
+export type PlanConfirmationStatus = "draft" | "confirmed";
+
+export interface PlanConfirmation {
+  status: PlanConfirmationStatus;
+  confirmed_at?: string;
+}
+
+export interface ComponentInstall {
+  command: string;
+  notes?: string;
+}
+
+export interface ComponentHealthcheck {
+  kind: "http" | "tcp" | "command";
+  url?: string;
+  port?: number;
+  command?: string;
+}
+
+export interface ComponentSeed {
+  /** 工作区没有种子时必须显式 not_done，禁止编造种子。 */
+  status: "not_done" | "present";
+  path?: string;
+  notes?: string;
+}
+
+export interface RunPlanComponent {
+  id: string;
+  role: string;
+  depends_on: string[];
+  install: ComponentInstall;
+  start_order: number;
+  healthcheck: ComponentHealthcheck;
+  logs: string;
+  seed: ComponentSeed;
+}
+
 export interface RunPlan {
   schema_version: SchemaVersion;
-  run_id: string;
-  study_id: string;
-  scope_id: string;
+  run_id?: string;
+  study_id?: string;
+  scope_id?: string;
   secret_refs: SecretRef[];
-  steps: string[];
+  steps?: string[];
+  components: RunPlanComponent[];
+  confirmation: PlanConfirmation;
 }
 
 export interface RunContext {
@@ -159,7 +221,12 @@ export interface RunningProject {
 export type StartResult =
   | { status: "success"; running_project: RunningProject }
   | { status: "partial"; notes: string }
-  | { status: "failed-runtime"; error: string };
+  | { status: "failed-runtime"; error: string }
+  | { status: "not_shipped"; message: string };
+
+export type StopResult =
+  | { status: "stopped" }
+  | { status: "not_shipped"; message: string };
 
 export interface EvidenceRecord {
   schema_version: SchemaVersion;

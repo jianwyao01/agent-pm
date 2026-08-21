@@ -5,6 +5,7 @@ import Ajv from "ajv";
 import type { ErrorObject, ValidateFunction } from "ajv";
 import addFormats from "ajv-formats";
 import { readJson, readJsonl, readYaml } from "./io.js";
+import { validateRunPlanShape } from "./run-plan.js";
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), "schemas");
 
@@ -137,6 +138,15 @@ export function validateDocument(kind: FileKind, data: unknown, path = "<memory>
     }
   }
   issues.push(...findPlaintextSecrets(kind, data, path));
+  if (kind === "run-plan") {
+    for (const issue of validateRunPlanShape(data).issues) {
+      issues.push({
+        kind,
+        path: issue.path ? `${path}#${issue.path}` : path,
+        message: issue.message
+      });
+    }
+  }
   return { ok: issues.length === 0, issues };
 }
 
