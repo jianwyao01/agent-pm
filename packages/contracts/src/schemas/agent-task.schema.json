@@ -1,0 +1,38 @@
+{
+  "$id": "https://behavior-map.dev/schemas/agent-task.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "agent-task",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "run_id",
+    "analysis_root",
+    "approved_read_paths",
+    "policy"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "task_id": { "type": "string" },
+    "run_id": { "type": "string" },
+    "analysis_root": { "type": "string" },
+    "approved_read_paths": { "type": "array", "items": { "type": "string" } },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "inherit_host_credentials",
+        "load_project_agent_config",
+        "workspace",
+        "network"
+      ],
+      "properties": {
+        "inherit_host_credentials": { "const": false },
+        "load_project_agent_config": { "const": false },
+        "workspace": { "const": "read_only" },
+        "network": { "const": "denied_or_explicit" }
+      }
+    }
+  }
+}

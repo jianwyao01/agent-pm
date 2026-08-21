@@ -1,0 +1,52 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { markMissingSupport, type StartResult } from "@behavior-map/contracts";
+
+const contractsDir = join(dirname(fileURLToPath(import.meta.url)), "../packages/contracts/src");
+
+describe("核心类型边界", () => {
+  it("contracts 源码不焊接产品域名词", () => {
+    const files = ["types.ts", "interfaces.ts", "ids.ts", "display.ts"];
+    for (const file of files) {
+      const text = readFileSync(join(contractsDir, file), "utf8");
+      expect(text).not.toMatch(/Rocket\.Chat/);
+      expect(text).not.toMatch(/\bRoom\b/);
+      expect(text).not.toMatch(/\bChannel\b/);
+    }
+  });
+
+  it("只有 success 的 StartResult 带有 explore 可用的 RunningProject", () => {
+    const success: StartResult = {
+      status: "success",
+      running_project: {
+        schema_version: "0.1.0",
+        usable_for_explore: true,
+        base_url: "https://example.test"
+      }
+    };
+    const partial: StartResult = { status: "partial", notes: "boot degraded" };
+    const failed: StartResult = { status: "failed-runtime", error: "listen failed" };
+    expect("running_project" in success).toBe(true);
+    expect("running_project" in partial).toBe(false);
+    expect("running_project" in failed).toBe(false);
+  });
+
+  it("缺支持时标 stale/not_observed，不删除 journey_id", () => {
+    const journeys = markMissingSupport(
+      [
+        {
+          id: "jny-send-001",
+          name: "发送一条消息（已审定）",
+          status: "accepted",
+          effect_ids: ["eff-current"]
+        }
+      ],
+      []
+    );
+    expect(journeys).toHaveLength(1);
+    expect(journeys[0].id).toBe("jny-send-001");
+    expect(journeys[0].status).toBe("stale");
+  });
+});

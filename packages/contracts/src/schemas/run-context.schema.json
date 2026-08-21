@@ -1,0 +1,25 @@
+{
+  "$id": "https://behavior-map.dev/schemas/run-context.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "run-context",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "role",
+    "locale",
+    "flags",
+    "credential_ref",
+    "cookie_ref",
+    "entry_url"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "role": { "type": "string", "minLength": 1 },
+    "locale": { "type": "string", "minLength": 1 },
+    "flags": { "type": "array", "items": { "type": "string" } },
+    "credential_ref": { "type": "string", "minLength": 1 },
+    "cookie_ref": { "type": "string", "minLength": 1 },
+    "entry_url": { "type": "string", "minLength": 1 }
+  }
+}

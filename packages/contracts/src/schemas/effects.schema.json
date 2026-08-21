@@ -1,0 +1,48 @@
+{
+  "$id": "https://behavior-map.dev/schemas/effects.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "effects",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "effects"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "effects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "observation"],
+        "properties": {
+          "id": { "type": "string" },
+          "name": { "type": "string" },
+          "observation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "observed", "display_value", "evidence_refs"],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "current_surface",
+                  "other_surface",
+                  "collection",
+                  "indicator",
+                  "notification",
+                  "backend_operation"
+                ]
+              },
+              "subtype": { "type": "string" },
+              "transport": {
+                "enum": ["http", "websocket", "rpc", "event", "database", "unknown"]
+              },
+              "observed": { "type": "boolean" },
+              "display_value": { "type": "string" },
+              "evidence_refs": { "type": "array", "items": { "type": "string" } },
+              "surface_id": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

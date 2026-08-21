@@ -1,0 +1,14 @@
+{
+  "$id": "https://behavior-map.dev/schemas/running-project.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "running-project",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "usable_for_explore", "base_url"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "usable_for_explore": { "const": true },
+    "base_url": { "type": "string", "minLength": 1 },
+    "pid_ref": { "type": "string" }
+  }
+}

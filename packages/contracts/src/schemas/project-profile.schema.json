@@ -1,0 +1,14 @@
+{
+  "$id": "https://behavior-map.dev/schemas/project-profile.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "project-profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "detected_kind", "entrypoints"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "detected_kind": { "type": "string", "minLength": 1 },
+    "entrypoints": { "type": "array", "items": { "type": "string" } },
+    "notes": { "type": "string" }
+  }
+}

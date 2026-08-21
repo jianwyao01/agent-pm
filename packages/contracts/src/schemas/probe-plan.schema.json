@@ -1,0 +1,25 @@
+{
+  "$id": "https://behavior-map.dev/schemas/probe-plan.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "probe-plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "human_approved",
+    "entry",
+    "session_slot",
+    "target_surface",
+    "send_action",
+    "other_surfaces_to_refresh"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "human_approved": { "const": true },
+    "entry": { "type": "string", "minLength": 1 },
+    "session_slot": { "type": "string", "minLength": 1 },
+    "target_surface": { "type": "string", "minLength": 1 },
+    "send_action": { "type": "string", "minLength": 1 },
+    "other_surfaces_to_refresh": { "type": "array", "items": { "type": "string" } }
+  }
+}
