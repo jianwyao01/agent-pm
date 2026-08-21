@@ -110,8 +110,8 @@ export function validateRunPlanShape(data: unknown): RunPlanReport {
 }
 
 /**
- * 将来 start() 只接受 confirmed 的 run-plan.yaml。
- * draft 必须被拒绝。M2 不实现 start。
+ * start() 只接受 confirmed 的 run-plan.yaml。
+ * draft 必须被拒绝，不得启动进程。
  */
 export function assertPlanConfirmed(plan: RunPlan): void {
   if (plan.confirmation?.status !== "confirmed") {

@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -29,7 +29,7 @@ describe("核心类型边界", () => {
       expect(text).not.toMatch(/\bRoom\b/);
       expect(text).not.toMatch(/\bChannel\b/);
     }
-    for (const file of ["adapter.ts", "detect.ts", "plan.ts", "scope.ts", "index.ts"]) {
+    for (const file of readdirSync(projectDir).filter((name) => name.endsWith(".ts"))) {
       const text = readFileSync(join(projectDir, file), "utf8");
       expect(text).not.toMatch(/Rocket\.Chat/);
       expect(text).not.toMatch(/RocketChat/);
@@ -41,17 +41,19 @@ describe("核心类型边界", () => {
   it("只有 success 的 StartResult 带有 explore 可用的 RunningProject", () => {
     const success: StartResult = {
       status: "success",
-      running_project: {
+      project: {
         schema_version: "0.1.0",
         usable_for_explore: true,
         base_url: "https://example.test"
-      }
+      },
+      components: [],
+      gaps: []
     };
-    const partial: StartResult = { status: "partial", notes: "boot degraded" };
-    const failed: StartResult = { status: "failed-runtime", error: "listen failed" };
-    expect("running_project" in success).toBe(true);
-    expect("running_project" in partial).toBe(false);
-    expect("running_project" in failed).toBe(false);
+    const partial: StartResult = { status: "partial", components: [], gaps: [] };
+    const failed: StartResult = { status: "failed-runtime", components: [], gaps: [] };
+    expect("project" in success).toBe(true);
+    expect("project" in partial).toBe(false);
+    expect("project" in failed).toBe(false);
   });
 
   it("缺支持时标 stale/not_observed，不删除 journey_id", () => {

@@ -9,6 +9,31 @@
     "schema_version": { "const": "0.1.0" },
     "usable_for_explore": { "const": true },
     "base_url": { "type": "string", "minLength": 1 },
-    "pid_ref": { "type": "string" }
+    "pid_ref": { "type": "string" },
+    "run_id": { "type": "string", "minLength": 1 },
+    "urls": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "components": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/component" }
+    }
+  },
+  "definitions": {
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "status", "started_by"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "role": { "type": "string" },
+        "status": { "const": "started" },
+        "url": { "type": "string" },
+        "pid": { "type": "integer" },
+        "logs": { "type": "string" },
+        "started_by": { "const": "project-adapter" }
+      }
+    }
   }
 }

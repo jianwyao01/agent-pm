@@ -169,11 +169,19 @@ export interface ComponentSeed {
   notes?: string;
 }
 
+export interface ComponentStartSpec {
+  command: string;
+  notes?: string;
+  env?: Record<string, string>;
+}
+
 export interface RunPlanComponent {
   id: string;
   role: string;
   depends_on: string[];
   install: ComponentInstall;
+  /** 进程启动命令。compose up 已在 install 拉起服务时可省略。 */
+  start?: ComponentStartSpec;
   start_order: number;
   healthcheck: ComponentHealthcheck;
   logs: string;
@@ -210,19 +218,65 @@ export interface StatusFile {
   scope_id: string;
 }
 
+export type ComponentStartStatus = "started" | "failed" | "refused" | "skipped";
+export type ComponentHealthStatus = "passed" | "failed" | "not_run";
+
+export interface ComponentStartResult {
+  id: string;
+  role: string;
+  status: ComponentStartStatus;
+  healthcheck: ComponentHealthStatus;
+  logs: string;
+  url?: string;
+  pid?: number;
+  started_at?: string;
+  reason?: string;
+}
+
+export interface Gap {
+  reason: string;
+  message: string;
+  component_id?: string;
+}
+
 /** 仅 StartResult.status === "success" 时才存在、且可用于 explore。 */
+export interface RunningComponentState {
+  id: string;
+  role: string;
+  status: "started";
+  url?: string;
+  pid?: number;
+  logs: string;
+  started_by: "project-adapter";
+}
+
 export interface RunningProject {
   schema_version: SchemaVersion;
   usable_for_explore: true;
   base_url: string;
   pid_ref?: string;
+  run_id?: string;
+  urls?: Record<string, string>;
+  components?: RunningComponentState[];
 }
 
 export type StartResult =
-  | { status: "success"; running_project: RunningProject }
-  | { status: "partial"; notes: string }
-  | { status: "failed-runtime"; error: string }
-  | { status: "not_shipped"; message: string };
+  | {
+      status: "success";
+      project: RunningProject;
+      components: ComponentStartResult[];
+      gaps: Gap[];
+    }
+  | {
+      status: "partial";
+      components: ComponentStartResult[];
+      gaps: Gap[];
+    }
+  | {
+      status: "failed-runtime";
+      components: ComponentStartResult[];
+      gaps: Gap[];
+    };
 
 export type StopResult =
   | { status: "stopped" }

@@ -19,6 +19,20 @@ function composeServiceName(part: ProjectProfile["parts"][number]): string | und
   return idx >= 0 ? clue.slice(idx + 1) : undefined;
 }
 
+function startCommand(part: ProjectProfile["parts"][number], frameworks: string[]): string {
+  if (part.role === "database" || part.role === "cache" || part.role === "service") {
+    const service = composeServiceName(part) ?? part.id;
+    return `docker compose up -d ${service}`;
+  }
+  if (frameworks.includes("meteor")) {
+    return "meteor";
+  }
+  if (frameworks.includes("node")) {
+    return "npm start";
+  }
+  return "start from how_to_run clues";
+}
+
 function installCommand(part: ProjectProfile["parts"][number], frameworks: string[]): string {
   if (part.role === "database" || part.role === "cache" || part.role === "service") {
     const service = composeServiceName(part) ?? part.id;
@@ -88,6 +102,7 @@ export function buildRunPlan(workspace: Workspace, profile: ProjectProfile): Run
     role: part.role,
     depends_on: dependsOn(part, profile.parts),
     install: { command: installCommand(part, profile.frameworks) },
+    start: { command: startCommand(part, profile.frameworks) },
     start_order: startOrder(part, index),
     healthcheck: healthcheckFor(part, profile.frameworks),
     logs: `logs/${part.id}.log`,
