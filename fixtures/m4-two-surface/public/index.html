@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>列表面</title>
+  </head>
+  <body>
+    <main id="surface-list" data-surface="surface-list" data-role="other" aria-label="列表面">
+      <h1>列表面</h1>
+      <nav>
+        <a
+          href="/compose?target=alpha"
+          id="nav-open-target"
+          data-action="click"
+          data-seed="nav-tree-open-surface"
+          data-scope-hint="打开已有目标 Surface"
+          aria-label="打开已有目标 Surface"
+          >打开目标面</a
+        >
+      </nav>
+      <ul id="item-list" data-collection="list"></ul>
+      <button
+        type="button"
+        id="control-admin"
+        data-action="click"
+        data-control="control-admin"
+        data-scope-hint="管理后台"
+        aria-label="管理后台"
+      >
+        管理后台
+      </button>
+      <button
+        type="button"
+        id="control-thread"
+        data-action="click"
+        data-control="control-thread"
+        data-scope-hint="话题串"
+        aria-label="话题串"
+      >
+        话题串
+      </button>
+      <div id="gesture-swipe" data-gesture="swipe" data-control="gesture-swipe" aria-label="swipe">
+        swipe
+      </div>
+    </main>
+    <script>
+      async function loadItems() {
+        const res = await fetch("/api/items");
+        const items = await res.json();
+        const ul = document.getElementById("item-list");
+        ul.innerHTML = items
+          .map((item) => `<li data-item-id="${item.id}">${item.text}</li>`)
+          .join("");
+      }
+      loadItems();
+    </script>
+  </body>
+</html>

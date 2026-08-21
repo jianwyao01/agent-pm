@@ -1,0 +1,19 @@
+schema_version: "0.1.0"
+id: study-message-sync
+name: 消息发送与状态同步
+goal: 打开已有目标 Surface，经导航树点击进入该 Surface，并发送一条消息，观察状态同步
+entry_seeds:
+  - nav-tree-open-surface
+  - send-message
+include_hints:
+  - 打开已有目标 Surface
+  - 导航树点击以打开该 Surface
+  - 发送一条消息
+exclude_hints:
+  - 穷尽导航树
+  - 创建容器
+  - 容器管理
+  - 穷尽私信
+  - 话题串
+  - 管理后台
+exploration_mode: approved_probe

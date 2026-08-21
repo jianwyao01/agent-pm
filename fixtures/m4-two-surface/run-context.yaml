@@ -1,0 +1,7 @@
+schema_version: "0.1.0"
+role: member
+locale: zh-CN
+flags: []
+credential_ref: secret:study-member
+cookie_ref: secret:session-cookie
+entry_url: http://127.0.0.1:0/

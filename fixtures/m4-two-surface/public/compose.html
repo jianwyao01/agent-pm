@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>撰写面</title>
+  </head>
+  <body>
+    <main id="surface-target" data-surface="surface-target" data-role="current" aria-label="撰写面">
+      <h1>撰写面</h1>
+      <form id="send-form" data-action="submit" data-seed="send-message" data-scope-hint="发送一条消息">
+        <textarea
+          id="compose-input"
+          name="text"
+          data-action="type"
+          data-control="compose-input"
+          aria-label="输入"
+        ></textarea>
+        <button
+          type="submit"
+          id="control-send"
+          data-action="submit"
+          data-seed="send-message"
+          data-control="control-send"
+          data-scope-hint="发送一条消息"
+          aria-label="发送一条消息"
+        >
+          发送
+        </button>
+      </form>
+      <p id="status"></p>
+      <button
+        type="button"
+        id="control-create-container"
+        data-action="click"
+        data-control="control-create-container"
+        data-scope-hint="创建容器"
+        aria-label="创建容器"
+      >
+        创建容器
+      </button>
+      <div
+        id="gesture-long-press"
+        data-gesture="long-press"
+        data-control="gesture-long-press"
+        aria-label="long-press"
+      >
+        long-press
+      </div>
+    </main>
+    <script>
+      document.getElementById("send-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const text = document.getElementById("compose-input").value;
+        await fetch("/send", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        document.getElementById("status").textContent = "已发送: " + text;
+      });
+    </script>
+  </body>
+</html>

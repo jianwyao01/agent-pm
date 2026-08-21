@@ -4,7 +4,8 @@ import {
   type DisplayCell,
   type DisplayProjection,
   type Effect,
-  type Journey
+  type Journey,
+  type Observation
 } from "./types.js";
 
 export function projectDisplay(journeys: Journey[], effects: Effect[]): DisplayProjection {
@@ -54,4 +55,38 @@ export function hasRequiredObservedCells(display: DisplayProjection): boolean {
     const backend = row.cells.find((cell) => cell.column === "后台")?.observed;
     return Boolean(current && (other || list) && backend);
   });
+}
+
+/**
+ * 把通用 Observation 投影到六列（本面/他面/列表/未读/通知/后台）。
+ * 缺列填「未观察到」。永不省略他面。未读/通知不必实际发生。
+ */
+export function displayObservations(
+  observations: Observation[],
+  journeyId = "jny-probe"
+): DisplayProjection {
+  const cells: DisplayCell[] = DISPLAY_COLUMNS.map((column) => {
+    const match = observations.find((observation) => {
+      if (observation.kind !== column.observation_kind) {
+        return false;
+      }
+      if ("subtype" in column && column.subtype) {
+        return observation.subtype === column.subtype;
+      }
+      return true;
+    });
+    const observed = Boolean(match?.observed);
+    return {
+      column: column.label,
+      observation_kind: column.observation_kind,
+      value: observed ? match?.display_value || UNOBSERVED : UNOBSERVED,
+      observed
+    };
+  });
+  const display: DisplayProjection = {
+    columns: DISPLAY_COLUMNS.map((column) => column.label),
+    rows: [{ journey_id: journeyId, cells }]
+  };
+  assertDisplayIncludesOtherSurface(display);
+  return display;
 }
