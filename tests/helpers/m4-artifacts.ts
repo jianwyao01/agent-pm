@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   SCHEMA_VERSION,
@@ -169,16 +170,8 @@ export async function writeM4AnalysisArtifacts(dir: string, runId: string): Prom
   };
   writeYaml(join(dir, "run-plan.yaml"), draftPlan);
   writeYaml(join(runRoot, "run-plan.yaml"), draftPlan);
-  writeYaml(join(dir, "model", "capabilities.yaml"), {
-    schema_version: SCHEMA_VERSION,
-    capabilities: []
-  });
-  writeYaml(join(dir, "model", "journeys.yaml"), { schema_version: SCHEMA_VERSION, journeys: [] });
-  writeYaml(join(dir, "model", "effects.yaml"), { schema_version: SCHEMA_VERSION, effects: [] });
-  writeYaml(join(dir, "model", "review-decisions.yaml"), {
-    schema_version: SCHEMA_VERSION,
-    decisions: []
-  });
+  // 新 run 不得改写已有 model/；仅在尚无审定文件时写入空骨架。
+  writeEmptyModelIfMissing(dir);
   writeJson(join(runRoot, "project-profile.json"), {
     schema_version: SCHEMA_VERSION,
     faces: [{ id: "compose", name: "撰写面", clues: ["two-surface"] }],
@@ -186,6 +179,21 @@ export async function writeM4AnalysisArtifacts(dir: string, runId: string): Prom
     frameworks: ["node"],
     how_to_run: []
   });
+}
+
+function writeEmptyModelIfMissing(dir: string): void {
+  const files: Array<[string, unknown]> = [
+    ["capabilities.yaml", { schema_version: SCHEMA_VERSION, capabilities: [] }],
+    ["journeys.yaml", { schema_version: SCHEMA_VERSION, journeys: [] }],
+    ["effects.yaml", { schema_version: SCHEMA_VERSION, effects: [] }],
+    ["review-decisions.yaml", { schema_version: SCHEMA_VERSION, decisions: [] }]
+  ];
+  for (const [name, payload] of files) {
+    const file = join(dir, "model", name);
+    if (!existsSync(file)) {
+      writeYaml(file, payload);
+    }
+  }
 }
 
 export function m4ApprovedReads(runId: string): string[] {

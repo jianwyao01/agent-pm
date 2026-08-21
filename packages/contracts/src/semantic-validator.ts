@@ -282,10 +282,11 @@ export function validateSemantics(analysisRoot: string): SemanticReport {
     const diffFile = join(analysisRoot, "runs", runId, "diff.json");
     if (existsSync(diffFile) && prev) {
       const diff = readJson<DiffFile>(diffFile);
-      if (diff.baseline_run_id !== prev && diff.baseline_run_id !== runId) {
+      const explicit = diff.baseline_source === "explicit";
+      if (!explicit && diff.baseline_run_id !== prev && diff.baseline_run_id !== runId) {
         issues.push({
           code: "diff_baseline_not_previous",
-          message: `diff.json 默认应对比同一 study+scope 的上一完成 run（期望 ${prev}）`,
+          message: `diff.json 默认应对比同一 study+scope 的上一完成 run（期望 ${prev}）；其它基线只能通过显式参数`,
           path: diffFile
         });
       }
@@ -304,7 +305,7 @@ export function findPreviousCompletedRun(
   const completed: string[] = [];
   for (const runId of listRunIds(analysisRoot)) {
     if (runId === currentRunId) {
-      continue;
+      break;
     }
     const statusFile = join(analysisRoot, "runs", runId, "status.json");
     if (!existsSync(statusFile)) {

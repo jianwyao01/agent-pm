@@ -2,9 +2,9 @@
 
 通用产品行为分析器。核心对象是 **Surface / Control / Journey / Observation**，不绑定任何聊天或代码托管产品。
 
-> **当前：M0 合约 + Mock，M1 Source 快照（git / local），M2 detect + plan + scope，M3 多组件 start/stop，M4 Discovery scan/explore/execute + 一次 Probe 发送，以及 M5 真实 AgentRunner（事后 classify / prune）。**  
-> 这不是 Rocket.Chat 级验收。产品级 RC 提案是后续在操作者机器上、用户将该仓库标为 trusted 并提供会话之后的可信运行，**不是 CI**。  
-> CI 使用微型本地进程与双 Surface 夹具，不需要 LLM API key，也不需要外网。不宣传对未信任目标的安全执行。
+> **当前：M0 合约 + Mock，M1 Source 快照（git / local），M2 detect + plan + scope，M3 多组件 start/stop，M4 Discovery scan/explore/execute + 一次 Probe 发送，M5 真实 AgentRunner（事后 classify / prune），以及 M6 人工审定模型 + 四份导出。**  
+> 这不是 Rocket.Chat 级验收。产品级 RC 证明（真实发送上的 MAP）是后续在操作者 Linux 机器上、用户将该仓库标为 trusted 并提供会话之后的可信运行，**不是 CI**。  
+> CI 使用微型本地进程与双 Surface 夹具，不需要 LLM API key，也不需要外网。不宣传对未信任目标的安全执行。不声称目标应用 CI 变绿。
 
 ## 已交付
 
@@ -43,13 +43,20 @@
 - LLM 可选，默认关闭；CI 不需要 API key 或外网
 - 提案中的 run-plan **不会**被 `start()` 读取，只认人类确认的 `run-plan.yaml`
 
+### M6
+- 人类审定写入唯一规范模型 `analysis/model/`（capabilities / journeys / effects / review-decisions）
+- 可 keep / reject / rename，并可补录一条其认为有效的旅程；`journey_id` 接受时分配，重命名不改 id
+- 新 run 写新的 `runs/<run-id>/` 与 `diff.json`；默认基线为同一 study+scope 的上一完成 run；其它基线只能显式 `--baseline`
+- 未再观察到的项标 `stale` / `not_observed`，不静默删除
+- 四个导出函数消费同一已审定旅程列表：产品地图（中文工具说明）、Mermaid、只读离线 Web、Playwright 草稿
+
 ## 尚未交付
 
-- 人工审定模型 + 四份导出（M6）
 - Effect DAG / Reconciler / 能力注册表 / Worker / Broker
 - 在 CI 中克隆任何真实产品仓库
+- 产品级 Rocket.Chat 发送上的 MAP（操作者机器上的后续可信运行）
 
-详见 [docs/M0.md](docs/M0.md)、[docs/M1.md](docs/M1.md)、[docs/M2.md](docs/M2.md)、[docs/M3.md](docs/M3.md)、[docs/M4.md](docs/M4.md) 与 [docs/M5.md](docs/M5.md)。
+详见 [docs/M0.md](docs/M0.md)、[docs/M1.md](docs/M1.md)、[docs/M2.md](docs/M2.md)、[docs/M3.md](docs/M3.md)、[docs/M4.md](docs/M4.md)、[docs/M5.md](docs/M5.md) 与 [docs/M6.md](docs/M6.md)。
 
 ## 目录
 
@@ -60,6 +67,7 @@ packages/project/     # ProjectAdapter：detect + plan + start/stop
 packages/discovery/   # DiscoveryAdapter：scan / explore / execute
 packages/agent/       # AgentRunner：Mock（合约测试）+ DefaultAgentRunner（M5 真实分析）
 packages/export/      # generateProductMap / Diagrams / Web / Tests
+packages/review/      # 人工审定 model/ + writeRunDiff
 fixtures/m0-fake-study/
 fixtures/m2-message-sync/
 fixtures/m4-two-surface/
@@ -69,6 +77,7 @@ docs/M2.md
 docs/M3.md
 docs/M4.md
 docs/M5.md
+docs/M6.md
 tests/
 ```
 
@@ -79,9 +88,9 @@ npm install
 npm test
 ```
 
-`npm test` 覆盖：结构 schema、语义校验、MockAgentRunner 合约、假数据走查、M1 SourceProvider（临时微型 git 夹具）、M2 detect/plan/scope、M3 多组件 start/stop（微型本地进程）、M4 Discovery + 一次 probe 发送（双 Surface 夹具），以及 M5 真实 AgentRunner 对 M4 产物的确定性分析。不克隆真实产品，不要求 LLM API key。
+`npm test` 覆盖：结构 schema、语义校验、MockAgentRunner 合约、假数据走查、M1 SourceProvider（临时微型 git 夹具）、M2 detect/plan/scope、M3 多组件 start/stop（微型本地进程）、M4 Discovery + 一次 probe 发送（双 Surface 夹具）、M5 真实 AgentRunner 对 M4 产物的确定性分析，以及 M6 人工审定 + 四份导出。不克隆真实产品，不要求 LLM API key。
 
-生成的 Playwright spec **可被发现、含 Journey ID**；不可靠 locator 使用 `test.skip` / TODO。M0 **不运行这些测试，也不声称它们已通过**。
+生成的 Playwright spec **可被发现、含 Journey ID**；不可靠 locator 使用 `test.skip` / TODO。**不运行这些测试，也不声称它们已对目标应用通过**。
 
 ## 许可
 

@@ -56,6 +56,17 @@ describe("核心类型边界", () => {
       expect(text).not.toMatch(/\bRoom\b/);
       expect(text).not.toMatch(/\bChannel\b/);
     }
+    const reviewDir = join(dirname(fileURLToPath(import.meta.url)), "../packages/review/src");
+    const exportDir = join(dirname(fileURLToPath(import.meta.url)), "../packages/export/src");
+    for (const dir of [reviewDir, exportDir]) {
+      for (const file of readdirSync(dir).filter((name) => name.endsWith(".ts"))) {
+        const text = readFileSync(join(dir, file), "utf8");
+        expect(text).not.toMatch(/Rocket\.Chat/);
+        expect(text).not.toMatch(/RocketChat/);
+        expect(text).not.toMatch(/\bRoom\b/);
+        expect(text).not.toMatch(/\bChannel\b/);
+      }
+    }
   });
 
   it("只有 success 的 StartResult 带有 explore 可用的 RunningProject", () => {

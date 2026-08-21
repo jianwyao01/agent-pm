@@ -18,6 +18,36 @@
     "current_run_id": { "type": "string", "minLength": 1 },
     "comparison_mode": { "enum": ["same_snapshot", "changed_snapshot"] },
     "study_id": { "type": "string", "minLength": 1 },
-    "scope_id": { "type": "string", "minLength": 1 }
+    "scope_id": { "type": "string", "minLength": 1 },
+    "baseline_source": { "enum": ["previous_completed", "explicit", "self"] },
+    "new_proposals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["task_id", "proposal_id", "proposed_journey_names", "proposed_effect_names"],
+        "properties": {
+          "task_id": { "type": "string" },
+          "proposal_id": { "type": "string" },
+          "kind": {
+            "enum": ["classify_features", "build_journeys", "analyze_effects", "prune_candidates"]
+          },
+          "proposed_journey_names": { "type": "array", "items": { "type": "string" } },
+          "proposed_effect_names": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "missing_support": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["journey_id", "status"],
+        "properties": {
+          "journey_id": { "type": "string" },
+          "status": { "enum": ["stale", "not_observed"] }
+        }
+      }
+    }
   }
 }

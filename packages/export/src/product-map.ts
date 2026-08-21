@@ -5,8 +5,10 @@ import {
   projectDisplay,
   type ProductMap,
   type ReviewedModel,
-  writeJson
+  writeJson,
+  writeText
 } from "@behavior-map/contracts";
+import { renderProductMapProse } from "./prose.js";
 import { journeyIdsOf, writeManifest } from "./shared.js";
 
 export function generateProductMap(model: ReviewedModel, generatedRoot: string): ProductMap {
@@ -23,6 +25,7 @@ export function generateProductMap(model: ReviewedModel, generatedRoot: string):
     display
   };
   writeJson(join(outDir, "product-map.json"), productMap);
+  writeText(join(outDir, "product-map.md"), renderProductMapProse(model));
   writeManifest(outDir, "product-map", productMap.journey_ids);
   return productMap;
 }

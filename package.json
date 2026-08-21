@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "行为地图：通用产品行为分析器（M0–M5：合约、Source、detect/plan、start/stop、Discovery、真实 AgentRunner）",
+  "description": "行为地图：通用产品行为分析器（M0–M6：合约、Source、detect/plan、start/stop、Discovery、真实 AgentRunner、人工审定与四份导出）",
   "license": "MIT",
   "workspaces": [
     "packages/contracts",
@@ -11,7 +11,8 @@
     "packages/export",
     "packages/source",
     "packages/project",
-    "packages/discovery"
+    "packages/discovery",
+    "packages/review"
   ],
   "scripts": {
     "test": "vitest run && tsc --noEmit -p tsconfig.json",
