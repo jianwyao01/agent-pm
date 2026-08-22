@@ -5,7 +5,7 @@ import { journeyIdsOf, writeManifest } from "./shared.js";
 /**
  * 生成可发现的 Playwright spec。M0 只生成，不执行，也不声称测试已通过。
  * 有 steps 时按 approved_locator 顺序发出；无 steps 时沿用 journey.control_id。
- * 只读 model/，不读 probe-plan.yaml。禁止默认 #control-send。
+ * 只读 model/ 上的 steps 与 control locator。禁止默认 #control-send。
  * 不可靠 locator → test.skip 或 TODO。
  */
 export function generateTests(model: ReviewedModel, generatedRoot: string): string {
