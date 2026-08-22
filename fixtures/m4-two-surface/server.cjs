@@ -41,6 +41,93 @@ function sendFile(res, file, type) {
   res.end(fs.readFileSync(file));
 }
 
+function sendHtml(res, html) {
+  res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+  res.end(html);
+}
+
+// 延迟页不落盘为 .html，避免 M4 scan 把尚未绘制的控件当成静态候选。
+function lateComposePage() {
+  return `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>延迟撰写面</title>
+  </head>
+  <body>
+    <main id="surface-target" data-surface="surface-target" data-role="current" aria-label="撰写面">
+      <h1>延迟撰写面</h1>
+      <div id="mount"></div>
+      <p id="status"></p>
+      <ul id="item-list" data-collection="list"></ul>
+      <button type="button" id="control-last-decoy" aria-label="最后一个按钮">最后一个按钮</button>
+    </main>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const never = params.get("paint") === "never";
+      const rawDelay = Number(params.get("delay") || 500);
+      const delay = Number.isFinite(rawDelay) ? Math.min(800, Math.max(300, rawDelay)) : 500;
+
+      async function loadItems() {
+        const res = await fetch("/api/items");
+        const items = await res.json();
+        const ul = document.getElementById("item-list");
+        if (!ul) {
+          return;
+        }
+        ul.innerHTML = items
+          .map((item) => "<li data-item-id=\\"" + item.id + "\\">" + item.text + "</li>")
+          .join("");
+      }
+
+      async function postItem(text) {
+        await fetch("/send", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        document.getElementById("status").textContent = "已发送: " + text;
+        await loadItems();
+      }
+
+      function paintBound() {
+        const mount = document.getElementById("mount");
+        const form = document.createElement("form");
+        form.id = "send-form";
+        const input = document.createElement("textarea");
+        input.id = "compose-input";
+        input.name = "text";
+        input.setAttribute("aria-label", "输入");
+        const button = document.createElement("button");
+        button.type = "submit";
+        button.id = "control-send";
+        button.setAttribute("aria-label", "发送一条消息");
+        button.textContent = "发送";
+        form.appendChild(input);
+        form.appendChild(button);
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const raw = document.getElementById("compose-input").value;
+          const text = String(raw || "").trim() || "probe-item";
+          await postItem(text);
+        });
+        mount.replaceChildren(form);
+      }
+
+      document.getElementById("control-last-decoy").addEventListener("click", async () => {
+        await postItem("decoy-fallback");
+      });
+
+      loadItems();
+      if (!never) {
+        setTimeout(paintBound, delay);
+      }
+    </script>
+  </body>
+</html>
+`;
+}
+
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -115,7 +202,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/compose-late" || url.pathname === "/compose-late.html") {
-    sendFile(res, path.join(publicDir, "compose-late.html"), "text/html; charset=utf-8");
+    sendHtml(res, lateComposePage());
     return;
   }
   res.writeHead(404);
