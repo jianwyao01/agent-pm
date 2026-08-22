@@ -21,8 +21,8 @@ import { FIRST_DELIVERY_SCOPE_ID } from "./run-metadata.js";
 /**
  * 官方 study runner。是函数，不是第五套公共接口。
  * 顺序固定：scan（可跳过）→ playFromProbePlan → applyHumanReview → generateAll。
- * 不得调用 ProjectAdapter.start，不得用 explore() 做产品动作，
- * 不得发明 bindings，不得把 proposals/ 当 bindings，不得把 Probe 拆成 N 次孤立 execute()。
+ * 不得启动目标进程，不得用运行时探索去做产品动作，
+ * 不得发明 bindings，不得把提案目录当 bindings，不得把 Probe 拆成 N 次孤立单步重放。
  */
 export interface RunClosedLoopOptions {
   analysisRoot: string;

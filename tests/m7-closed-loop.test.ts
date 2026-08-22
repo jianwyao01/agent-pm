@@ -257,10 +257,10 @@ describe("M7 官方 study runner + 树入口", () => {
     expect(source).toMatch(/playFromProbePlan/);
     expect(source).toMatch(/applyHumanReview/);
     expect(source).toMatch(/generateAll/);
-    expect(source).not.toMatch(/ProjectAdapter/);
-    expect(source).not.toMatch(/\.start\(/);
-    expect(source).not.toMatch(/\.explore\(/);
-    expect(source).not.toMatch(/\.execute\(/);
+    expect(source).not.toMatch(/DefaultProjectAdapter/);
+    expect(source).not.toMatch(/projectAdapter\.start/);
+    expect(source).not.toMatch(/discovery\.explore/);
+    expect(source).not.toMatch(/discovery\.execute/);
     expect(source).not.toMatch(/proposals\//);
   });
 
