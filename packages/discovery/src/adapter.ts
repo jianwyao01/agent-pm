@@ -18,6 +18,8 @@ import { executeAction, exploreRuntime, type RuntimeOptions } from "./runtime.js
 export interface DiscoveryAdapterOptions extends ScanOptions, RuntimeOptions {
   analysisRoot?: string;
   sessionRefs?: Record<string, string>;
+  /** 未先 scan / explore 时 play 使用的 scope；不是第五套接口。 */
+  scope?: Scope;
 }
 
 export class DefaultDiscoveryAdapter implements DiscoveryAdapter {
@@ -72,11 +74,7 @@ export class DefaultDiscoveryAdapter implements DiscoveryAdapter {
         cross_actor: { executed: false, display_value: CROSS_ACTOR_UNEXECUTED }
       };
     }
-    const scope = this.lastScope ?? {
-      id: this.options.runId ?? "scope-discovery",
-      include_hints: [],
-      exclude_hints: []
-    };
+    const scope = this.resolvedScope();
     return executeAction(running, context, action, scope, this.runtimeOptions());
   }
 
@@ -98,12 +96,19 @@ export class DefaultDiscoveryAdapter implements DiscoveryAdapter {
         }
       ];
     }
-    const scope = this.lastScope ?? {
-      id: this.options.runId ?? "scope-discovery",
-      include_hints: [],
-      exclude_hints: []
-    };
+    const scope = this.resolvedScope();
     return playActions(running, context, actions, scope, this.runtimeOptions());
+  }
+
+  private resolvedScope(): Scope {
+    return (
+      this.lastScope ??
+      this.options.scope ?? {
+        id: this.options.runId ?? "scope-discovery",
+        include_hints: [],
+        exclude_hints: []
+      }
+    );
   }
 
   private runtimeOptions(): RuntimeOptions {
