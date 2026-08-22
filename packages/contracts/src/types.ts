@@ -503,6 +503,11 @@ export interface Journey {
   control_id?: string;
   /** 接受或重定位时从人类批准的 ProbePlan.actions 拷入；model/ 是唯一语义源。 */
   steps?: JourneyStep[];
+  /**
+   * 该 study 的 RunContext.entry_url。
+   * 仅由 applyHumanReview 的 addJourney / retarget 从 run-context.yaml 拷入；hydrateModel 不得发明。
+   */
+  entry_url?: string;
 }
 
 export interface Capability {

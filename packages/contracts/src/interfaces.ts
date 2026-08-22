@@ -26,6 +26,7 @@ import type {
  * M6 实现人工审定 model/ 与四份导出函数（不是第五套接口）。
  * M6b 把 play 定为官方 ProbePlan runner，并增加官方 retarget；play 仍不是第五套接口。
  * M7 的 runClosedLoop 是 review 包里的函数，不是第五套接口。
+ * M8 深化创建域：Journey.entry_url 与可指定 journey_id 的 addJourney；四接口不变。
  * boot / discovery 只消费 Workspace + SourceSnapshot，不得依赖 source.kind。
  * 替换 AgentRunner 时，Source / Project / Discovery / Export 代码无需改动。
  */

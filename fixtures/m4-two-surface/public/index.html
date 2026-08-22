@@ -18,7 +18,18 @@
           aria-label="打开已有目标 Surface"
           >打开目标面</a
         >
+        <a
+          href="/create"
+          id="nav-open-create"
+          data-action="click"
+          data-seed="nav-open-create"
+          data-control="nav-create-entry"
+          data-scope-hint="打开创建面"
+          aria-label="打开创建面"
+          >打开创建面</a
+        >
       </nav>
+      <ul id="created-nav" aria-label="已创建条目"></ul>
       <ul id="item-list" data-collection="list"></ul>
       <button
         type="button"
@@ -53,7 +64,19 @@
           .map((item) => `<li data-item-id="${item.id}">${item.text}</li>`)
           .join("");
       }
+      async function loadCreated() {
+        const res = await fetch("/api/created");
+        const created = await res.json();
+        const ul = document.getElementById("created-nav");
+        if (!ul) {
+          return;
+        }
+        ul.innerHTML = created
+          .map((item) => `<li data-created-id="${item.id}">${item.name}</li>`)
+          .join("");
+      }
       loadItems();
+      loadCreated();
     </script>
   </body>
 </html>

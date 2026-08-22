@@ -5,19 +5,21 @@ import { journeyIdsOf, writeManifest } from "./shared.js";
 /**
  * 生成可发现的 Playwright spec。M0 只生成，不执行，也不声称测试已通过。
  * 有 steps 时按 approved_locator 顺序发出；无 steps 时沿用 journey.control_id。
- * 只读 model/ 上的 steps 与 control locator。禁止默认 #control-send。
+ * 只读 model/ 上的 steps、entry_url 与 control locator。禁止默认 #control-send。
+ * 有 steps 且有 entry_url 时第一行 page.goto(entry_url)；否则 about:blank。
  * 不可靠 locator → test.skip 或 TODO。
  */
 export function generateTests(model: ReviewedModel, generatedRoot: string): string {
   const outDir = join(generatedRoot, "tests");
   const blocks = model.journeys.map((journey) => {
+    const goto = gotoTarget(journey);
     const emitted = locatorsForJourney(model, journey);
     if (!emitted.ok) {
       return `// Journey ID: ${journey.id}
 test('${journey.id}: ${escapeTs(journey.name)}', async ({ page }) => {
   // TODO: 待人工提供可靠 locator 后再启用
   test.skip(true, 'Unreliable locator: ${escapeTs(emitted.reason)}');
-  await page.goto('about:blank');
+  await page.goto(${goto});
 });`;
     }
     const calls = emitted.steps
@@ -25,7 +27,7 @@ test('${journey.id}: ${escapeTs(journey.name)}', async ({ page }) => {
       .join("\n  ");
     return `// Journey ID: ${journey.id}
 test('${journey.id}: ${escapeTs(journey.name)}', async ({ page }) => {
-  await page.goto('about:blank');
+  await page.goto(${goto});
   ${calls}
 });`;
   });
@@ -40,6 +42,13 @@ ${blocks.join("\n\n")}
   writeText(join(outDir, "journeys.spec.ts"), spec);
   writeManifest(outDir, "tests", journeyIdsOf(model));
   return spec;
+}
+
+function gotoTarget(journey: ReviewedModel["journeys"][number]): string {
+  if (journey.steps && journey.steps.length > 0 && journey.entry_url) {
+    return JSON.stringify(journey.entry_url);
+  }
+  return "'about:blank'";
 }
 
 function locatorsForJourney(

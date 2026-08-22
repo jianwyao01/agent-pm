@@ -2,7 +2,7 @@
 
 通用产品行为分析器。核心对象是 **Surface / Control / Journey / Observation**，不绑定任何聊天或代码托管产品。
 
-> **当前：M0 合约 + Mock，M1 Source 快照（git / local），M2 detect + plan + scope，M3 多组件 start/stop，M4 Discovery scan/explore/execute + 一次 Probe 发送，M4b Control / Binding / SessionProvider（execute 只重放人类 locator），M5 真实 AgentRunner（事后 classify / prune），M6 人工审定模型 + 四份导出，M6b 官方闭环（ProbePlan.actions + 官方 play + 官方 retarget + generateAll），以及 M7 官方 study runner（runClosedLoop + 夹具树入口）。**  
+> **当前：M0 合约 + Mock，M1 Source 快照（git / local），M2 detect + plan + scope，M3 多组件 start/stop，M4 Discovery scan/explore/execute + 一次 Probe 发送，M4b Control / Binding / SessionProvider（execute 只重放人类 locator），M5 真实 AgentRunner（事后 classify / prune），M6 人工审定模型 + 四份导出，M6b 官方闭环（ProbePlan.actions + 官方 play + 官方 retarget + generateAll），M7 官方 study runner（runClosedLoop + 夹具树入口），以及 M8 创建面深化域（Journey.entry_url + 可指定 journey_id 的 addJourney + 夹具创建入口）。**  
 > 这不是 Rocket.Chat 级验收。产品级 RC 证明（真实发送上的 MAP）是后续在操作者 Linux 机器上、用户将该仓库标为 trusted 并提供会话之后的可信运行，**不是 CI**。  
 > CI 使用微型本地进程与双 Surface 夹具，不需要 LLM API key，也不需要外网。不宣传对未信任目标的安全执行。不声称目标应用 CI 变绿。
 
@@ -71,13 +71,19 @@
 - `ProbePlan.actions` 为 click 树入口 + type + submit/click；`send_action` 等于最后发送步；`entry` 不变
 - CI 仍用同一套登录墙 + 撰写 + 列表夹具。这不是产品 RC 证明。create-channel 是后续深化域
 
+### M8
+- Journey 可有可选 `entry_url`；`applyHumanReview` 的 addJourney / retarget 从该 study 的 `run-context.yaml` 拷入；`hydrateModel` 不发明
+- `addJourney` 首次接受可指定稳定 `journey_id`（锁定形状为数组；兼容单个对象）；已存在则失败；`control_id` 必须有人类绑定
+- `generateTests`：有 steps 且有 `entry_url` 时第一行 `page.goto(entry_url)`，否则 `about:blank`；导出时不读 `probe-plan.yaml` / `run-context.yaml`
+- 夹具增加创建入口（名称栏 + 提交，导航/列表出现新项）。CI 用新的 study 形分析 + 新的 `journey_id`（不是 `jny-send`）。这不是产品 RC 证明
+
 ## 尚未交付
 
 - Effect DAG / Reconciler / 能力注册表 / Worker / Broker
 - 在 CI 中克隆任何真实产品仓库
 - 产品级 Rocket.Chat 发送上的 MAP（操作者机器上的后续可信运行）
 
-详见 [docs/M0.md](docs/M0.md)、[docs/M1.md](docs/M1.md)、[docs/M2.md](docs/M2.md)、[docs/M3.md](docs/M3.md)、[docs/M4.md](docs/M4.md)、[docs/M4b.md](docs/M4b.md)、[docs/M5.md](docs/M5.md)、[docs/M6.md](docs/M6.md)、[docs/M6b.md](docs/M6b.md) 与 [docs/M7.md](docs/M7.md)。
+详见 [docs/M0.md](docs/M0.md)、[docs/M1.md](docs/M1.md)、[docs/M2.md](docs/M2.md)、[docs/M3.md](docs/M3.md)、[docs/M4.md](docs/M4.md)、[docs/M4b.md](docs/M4b.md)、[docs/M5.md](docs/M5.md)、[docs/M6.md](docs/M6.md)、[docs/M6b.md](docs/M6b.md)、[docs/M7.md](docs/M7.md) 与 [docs/M8.md](docs/M8.md)。
 
 ## 目录
 
@@ -102,6 +108,7 @@ docs/M5.md
 docs/M6.md
 docs/M6b.md
 docs/M7.md
+docs/M8.md
 tests/
 ```
 
@@ -112,7 +119,7 @@ npm install
 npm test
 ```
 
-`npm test` 覆盖：结构 schema、语义校验、MockAgentRunner 合约、假数据走查、M1 SourceProvider（临时微型 git 夹具）、M2 detect/plan/scope、M3 多组件 start/stop（微型本地进程）、M4 Discovery + 一次 probe 发送（双 Surface 夹具）、M4b Control/Binding/SessionProvider（登录墙夹具 + 人类 locator 重放）、M5 真实 AgentRunner 对 M4 产物的确定性分析、M6 人工审定 + 四份导出、M6b 官方 play / retarget / generateAll 闭环，以及 M7 `runClosedLoop`（树入口 click + type + submit）。不克隆真实产品，不要求 LLM API key。
+`npm test` 覆盖：结构 schema、语义校验、MockAgentRunner 合约、假数据走查、M1 SourceProvider（临时微型 git 夹具）、M2 detect/plan/scope、M3 多组件 start/stop（微型本地进程）、M4 Discovery + 一次 probe 发送（双 Surface 夹具）、M4b Control/Binding/SessionProvider（登录墙夹具 + 人类 locator 重放）、M5 真实 AgentRunner 对 M4 产物的确定性分析、M6 人工审定 + 四份导出、M6b 官方 play / retarget / generateAll 闭环、M7 `runClosedLoop`（树入口 click + type + submit），以及 M8 创建入口（打开创建 + 填名称 + 提交，`goto entry_url`）。不克隆真实产品，不要求 LLM API key。
 
 生成的 Playwright spec **可被发现、含 Journey ID**；不可靠 locator 使用 `test.skip` / TODO。**不运行这些测试，也不声称它们已对目标应用通过**。
 

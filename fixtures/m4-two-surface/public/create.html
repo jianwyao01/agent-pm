@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>创建面</title>
+  </head>
+  <body>
+    <main id="surface-new" data-surface="surface-new" data-role="current" aria-label="创建面">
+      <h1>创建面</h1>
+      <form id="create-form" data-action="submit" data-seed="create-item" data-scope-hint="提交创建">
+        <input
+          id="create-name"
+          name="name"
+          type="text"
+          data-action="type"
+          data-control="create-name"
+          aria-label="名称"
+        />
+        <button
+          type="submit"
+          id="control-create-submit"
+          data-action="submit"
+          data-seed="create-item"
+          data-control="control-create-submit"
+          data-scope-hint="提交创建"
+          aria-label="提交创建"
+        >
+          提交
+        </button>
+      </form>
+      <p id="status"></p>
+      <p><a href="/" aria-label="返回列表">返回列表</a></p>
+    </main>
+    <script>
+      document.getElementById("create-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const raw = document.getElementById("create-name").value;
+        const name = String(raw || "").trim() || "created-item";
+        await fetch("/create", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name })
+        });
+        document.getElementById("status").textContent = "已创建: " + name;
+      });
+    </script>
+  </body>
+</html>

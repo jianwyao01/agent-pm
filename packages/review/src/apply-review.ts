@@ -23,6 +23,7 @@ import {
   type ProposedJourney,
   type ReviewDecision,
   type ReviewedModel,
+  type RunContext,
   type Transport
 } from "@behavior-map/contracts";
 import { effectIdFor, nextJourneyId } from "./ids.js";
@@ -48,7 +49,10 @@ export interface RenameSpec {
 }
 
 export interface AddedJourneySpec {
-  name: string;
+  /** 展示名。锁定形状可以只给 journey_id + control_id，缺省时用 journey_id。 */
+  name?: string;
+  /** 首次接受时可指定稳定 id；已存在则失败，应改用 retarget。 */
+  journey_id?: string;
   control_id?: string;
   effect_ids?: string[];
 }
@@ -66,7 +70,8 @@ export interface HumanReviewSpec {
   keep?: KeepJourneySpec[];
   reject?: RejectSpec[];
   rename?: RenameSpec[];
-  addJourney?: AddedJourneySpec;
+  /** 锁定形状为数组；兼容 M0–M7 的单个对象。 */
+  addJourney?: AddedJourneySpec | AddedJourneySpec[];
   retarget?: RetargetSpec[];
 }
 
@@ -101,6 +106,7 @@ export function applyHumanReview(options: ApplyHumanReviewOptions): ReviewedMode
   const candidates = loadRunCandidates(analysisRoot, runId);
   const bindings = loadRunBindings(analysisRoot, runId);
   const probePlan = loadStudyProbePlan(analysisRoot);
+  const runContext = loadStudyRunContext(analysisRoot);
   const proposals = loadRunProposals(analysisRoot, runId);
   const proposedJourneys = proposals.flatMap((item) => item.proposed_journeys);
   const proposedEffects = proposals.flatMap((item) => item.proposed_effects);
@@ -135,12 +141,12 @@ export function applyHumanReview(options: ApplyHumanReviewOptions): ReviewedMode
     applyRename(rename, journeys, decisions);
   }
 
-  if (spec.addJourney) {
-    applyAddJourney(spec.addJourney, journeys, decisions, capabilities, effects, probePlan);
+  for (const added of normalizeAddJourney(spec.addJourney)) {
+    applyAddJourney(added, journeys, decisions, capabilities, effects, probePlan, bindings, runContext);
   }
 
   for (const retarget of spec.retarget ?? []) {
-    applyRetarget(retarget, journeys, bindings, probePlan);
+    applyRetarget(retarget, journeys, bindings, probePlan, runContext);
   }
 
   const observedIds = observedJourneyIds(journeys, candidates, proposedJourneys);
@@ -315,30 +321,74 @@ function applyRename(rename: RenameSpec, journeys: Journey[], decisions: ReviewD
   }
 }
 
+function normalizeAddJourney(
+  spec: AddedJourneySpec | AddedJourneySpec[] | undefined
+): AddedJourneySpec[] {
+  if (!spec) {
+    return [];
+  }
+  return Array.isArray(spec) ? spec : [spec];
+}
+
 function applyAddJourney(
   added: AddedJourneySpec,
   journeys: Journey[],
   decisions: ReviewDecision[],
   capabilities: Capability[],
   effects: Effect[],
-  probePlan?: ProbePlan
+  probePlan: ProbePlan | undefined,
+  bindings: Binding[],
+  runContext: RunContext | undefined
 ): void {
+  if (added.journey_id) {
+    if (journeys.some((item) => item.id === added.journey_id)) {
+      throw new Error(`旅程 ${added.journey_id} 已存在，请使用 retarget，不要再创建一条`);
+    }
+    if (!added.control_id) {
+      throw new Error(`补录旅程 ${added.journey_id} 需要 control_id`);
+    }
+    assertHumanBinding(bindings, added.control_id, "补录");
+    const name = added.name?.trim() || added.journey_id;
+    const effectIds = added.effect_ids?.length ? added.effect_ids : effects.map((item) => item.id);
+    journeys.push({
+      id: added.journey_id,
+      name,
+      status: "accepted",
+      effect_ids: effectIds,
+      control_id: added.control_id,
+      ...stepsField(probePlan),
+      ...entryUrlField(runContext)
+    });
+    decisions.push({
+      candidate_id: `human-added:${added.journey_id}`,
+      review_status: "kept",
+      journey_id: added.journey_id
+    });
+    ensureSendCapability(capabilities, added.control_id);
+    return;
+  }
+
   const existingAdded = decisions.find((item) => item.candidate_id.startsWith("human-added:"));
   if (existingAdded?.journey_id) {
     return;
   }
-  if (journeys.some((item) => item.name === added.name)) {
+  const name = added.name?.trim();
+  if (!name) {
+    throw new Error("补录旅程需要 name 或 journey_id");
+  }
+  if (journeys.some((item) => item.name === name)) {
     return;
   }
-  const journeyId = nextJourneyId(added.name, journeys.map((item) => item.id));
+  const journeyId = nextJourneyId(name, journeys.map((item) => item.id));
   const effectIds = added.effect_ids?.length ? added.effect_ids : effects.map((item) => item.id);
   journeys.push({
     id: journeyId,
-    name: added.name,
+    name,
     status: "accepted",
     effect_ids: effectIds,
     control_id: added.control_id,
-    ...stepsField(probePlan)
+    ...stepsField(probePlan),
+    ...entryUrlField(runContext)
   });
   decisions.push({
     candidate_id: `human-added:${journeyId}`,
@@ -352,24 +402,31 @@ function applyRetarget(
   spec: RetargetSpec,
   journeys: Journey[],
   bindings: Binding[],
-  probePlan?: ProbePlan
+  probePlan: ProbePlan | undefined,
+  runContext: RunContext | undefined
 ): void {
   const journey = journeys.find((item) => item.id === spec.journey_id);
   if (!journey) {
     throw new Error(`重定位失败：不存在旅程 ${spec.journey_id}`);
   }
-  const human = bindings.find(
-    (row) => row.control_id === spec.control_id && row.approved_by === "human"
-  );
-  if (!human) {
-    throw new Error(
-      `重定位失败：control_id ${spec.control_id} 在本 run 的 bindings.jsonl 中没有 approved_by human 的绑定`
-    );
-  }
+  assertHumanBinding(bindings, spec.control_id, "重定位");
   journey.control_id = spec.control_id;
   const steps = stepsFromProbePlan(probePlan);
   if (steps) {
     journey.steps = steps;
+  }
+  const entryUrl = entryUrlField(runContext);
+  if (entryUrl.entry_url) {
+    journey.entry_url = entryUrl.entry_url;
+  }
+}
+
+function assertHumanBinding(bindings: Binding[], controlId: string, action: string): void {
+  const human = bindings.find((row) => row.control_id === controlId && row.approved_by === "human");
+  if (!human) {
+    throw new Error(
+      `${action}失败：control_id ${controlId} 在本 run 的 bindings.jsonl 中没有 approved_by human 的绑定`
+    );
   }
 }
 
@@ -383,6 +440,23 @@ function stepsFromProbePlan(plan?: ProbePlan): JourneyStep[] | undefined {
 function stepsField(plan?: ProbePlan): { steps: JourneyStep[] } | Record<string, never> {
   const steps = stepsFromProbePlan(plan);
   return steps ? { steps } : {};
+}
+
+function entryUrlField(context?: RunContext): { entry_url: string } | Record<string, never> {
+  return context?.entry_url ? { entry_url: context.entry_url } : {};
+}
+
+function loadStudyRunContext(analysisRoot: string): RunContext | undefined {
+  const file = join(analysisRoot, "run-context.yaml");
+  if (!existsSync(file)) {
+    return undefined;
+  }
+  const data = readYaml<RunContext>(file);
+  const report = validateDocument("run-context", data, file);
+  if (!report.ok) {
+    throw new Error(report.issues.map((issue) => issue.message).join("; "));
+  }
+  return data;
 }
 
 function loadStudyProbePlan(analysisRoot: string): ProbePlan | undefined {

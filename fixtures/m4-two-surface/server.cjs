@@ -8,6 +8,7 @@ const port = Number(process.env.PORT || 0);
 const publicDir = path.join(__dirname, "public");
 
 const items = [{ id: "seed-1", text: "已有条目" }];
+const created = [];
 let seq = 1;
 let loginPosted = false;
 
@@ -27,7 +28,8 @@ function needsAuth(pathname) {
     pathname !== "/health" &&
     pathname !== "/login" &&
     pathname !== "/debug/login-posted" &&
-    pathname !== "/api/items"
+    pathname !== "/api/items" &&
+    pathname !== "/api/created"
   );
 }
 
@@ -239,6 +241,26 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, 200, items);
     return;
   }
+  if (url.pathname === "/api/created") {
+    sendJson(res, 200, created);
+    return;
+  }
+  if (url.pathname === "/create" && req.method === "POST") {
+    if (!isAuthed(req)) {
+      sendJson(res, 401, { ok: false });
+      return;
+    }
+    const body = await parseBody(req);
+    const name = String(body.name || "").trim();
+    if (name) {
+      seq += 1;
+      const id = `created-${seq}`;
+      created.push({ id, name });
+      items.push({ id, text: name });
+    }
+    sendJson(res, 200, { ok: true, created, items });
+    return;
+  }
   if (url.pathname === "/send" && req.method === "POST") {
     if (!isAuthed(req)) {
       sendJson(res, 401, { ok: false });
@@ -259,6 +281,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/compose" || url.pathname === "/compose.html") {
     sendFile(res, path.join(publicDir, "compose.html"), "text/html; charset=utf-8");
+    return;
+  }
+  if (url.pathname === "/create" || url.pathname === "/create.html") {
+    sendFile(res, path.join(publicDir, "create.html"), "text/html; charset=utf-8");
     return;
   }
   if (url.pathname === "/compose-late" || url.pathname === "/compose-late.html") {
