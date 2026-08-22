@@ -16,6 +16,7 @@ import { executeAction, exploreRuntime, type RuntimeOptions } from "./runtime.js
 
 export interface DiscoveryAdapterOptions extends ScanOptions, RuntimeOptions {
   analysisRoot?: string;
+  sessionRefs?: Record<string, string>;
 }
 
 export class DefaultDiscoveryAdapter implements DiscoveryAdapter {
@@ -83,7 +84,9 @@ export class DefaultDiscoveryAdapter implements DiscoveryAdapter {
       runId: this.options.runId,
       runRoot: this.options.runRoot,
       snapshotId: this.options.snapshotId,
-      workspacePath: this.workspacePath ?? this.options.analysisRoot ?? this.options.workspacePath
+      workspacePath: this.workspacePath ?? this.options.analysisRoot ?? this.options.workspacePath,
+      analysisRoot: this.options.analysisRoot ?? this.workspacePath,
+      sessionRefs: this.options.sessionRefs
     };
   }
 }

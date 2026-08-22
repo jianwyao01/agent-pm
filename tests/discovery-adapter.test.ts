@@ -15,7 +15,7 @@ import {
   type RunningProject,
   type StartResult
 } from "@behavior-map/contracts";
-import { DefaultDiscoveryAdapter, snapshotDigestFor } from "@behavior-map/discovery";
+import { DefaultDiscoveryAdapter, loadControls, snapshotDigestFor } from "@behavior-map/discovery";
 import { DefaultProjectAdapter } from "@behavior-map/project";
 import { writePlanFile, writeTrusted, reservePort } from "./helpers/tiny-processes.js";
 import {
@@ -25,6 +25,7 @@ import {
   twoSurfacePlan,
   workspaceAt
 } from "./helpers/two-surface.js";
+import { boundSubmitAction, writeHumanBinding, writeStorageState } from "./helpers/m4b-session.js";
 
 function tmp(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -38,13 +39,13 @@ function toSuccess(result: StartResult): RunningProject {
   return result.project;
 }
 
-function sendAction(): Control {
+function sendAction(bindingId?: string): Control {
   return {
     id: "control-send",
     surface_id: "surface-target",
     name: "发送一条消息",
     action: "submit",
-    locator: { kind: "css", value: "#control-send", reliable: true }
+    ...(bindingId ? { binding_id: bindingId } : {})
   };
 }
 
@@ -129,7 +130,14 @@ describe("M4 DiscoveryAdapter", () => {
     });
     writePlanFile(dir, plan);
 
-    const discovery = new DefaultDiscoveryAdapter({ runId: "run-send" });
+    const sessionDir = tmp("bm-m4-session-");
+    const storageState = join(sessionDir, "storageState.json");
+    writeStorageState(storageState);
+    const discovery = new DefaultDiscoveryAdapter({
+      runId: "run-send",
+      analysisRoot: dir,
+      sessionRefs: { "secret:session-cookie": storageState }
+    });
     const scope = fixtureScope(dir);
     const scanned = await discovery.scan(workspaceAt(dir), scope);
     expect(scanned.candidates.some((row) => row.discovery_key.includes("control-send"))).toBe(true);
@@ -139,10 +147,21 @@ describe("M4 DiscoveryAdapter", () => {
     started.push(project);
 
     const context = fixtureContext(dir, `http://127.0.0.1:${appPort}/`);
+    const compose = fixtureContext(dir, `http://127.0.0.1:${appPort}/compose`);
     const explored = await discovery.explore(project, context, scope);
     expect(explored.status).not.toBe("refused");
 
-    const executed = await discovery.execute(project, context, sendAction());
+    const sendControl = loadControls(join(dir, "runs", "run-send")).find(
+      (row) => row.observed.name === "发送一条消息" || row.observed.name === "发送"
+    );
+    expect(sendControl).toBeTruthy();
+    const binding = writeHumanBinding(join(dir, "runs", "run-send"), {
+      binding_id: "bind-send",
+      control_id: sendControl!.control_id,
+      approved_locator: { type: "role", value: "button;name=发送一条消息" }
+    });
+
+    const executed = await discovery.execute(project, compose, boundSubmitAction(binding));
     expect(executed.status).toBe("success");
     expect(executed.cross_actor.display_value).toBe(CROSS_ACTOR_UNEXECUTED);
     expect(executed.cross_actor.executed).toBe(false);

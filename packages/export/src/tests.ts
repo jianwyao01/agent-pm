@@ -23,7 +23,7 @@ test('${journey.id}: ${escapeTs(journey.name)}', async ({ page }) => {
     return `// Journey ID: ${journey.id}
 test('${journey.id}: ${escapeTs(journey.name)}', async ({ page }) => {
   await page.goto('about:blank');
-  await page.locator(${JSON.stringify(locator)}).click();
+  ${playwrightCall(control?.locator?.kind, locator)}
 });`;
   });
 
@@ -37,6 +37,16 @@ ${blocks.join("\n\n")}
   writeText(join(outDir, "journeys.spec.ts"), spec);
   writeManifest(outDir, "tests", journeyIdsOf(model));
   return spec;
+}
+
+function playwrightCall(kind: string | undefined, locator: string): string {
+  if (kind === "role" || kind === "accessibility") {
+    const roleName = locator.match(/^(?:role=)?([^;[\]]+);name=(.+)$/);
+    if (roleName) {
+      return `await page.getByRole(${JSON.stringify(roleName[1].trim())}, { name: ${JSON.stringify(roleName[2].trim())} }).click(); // ${JSON.stringify(locator)}`;
+    }
+  }
+  return `await page.locator(${JSON.stringify(locator)}).click();`;
 }
 
 function escapeTs(value: string): string {

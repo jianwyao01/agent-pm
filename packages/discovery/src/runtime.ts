@@ -23,10 +23,17 @@ import {
 } from "@behavior-map/contracts";
 import { classifyScope } from "./scope-match.js";
 import { actualBackendFrom, closeSession, openSession, type DriverSession } from "./driver.js";
-import { loadCandidates, persistMerged, resolveRunRoot } from "./store.js";
+import {
+  collectProbeUrls,
+  dumpVisibleControls,
+  isPhase1ApprovedLocator,
+  locateApproved
+} from "./observe.js";
+import { loadBindings, loadCandidates, persistMerged, resolveRunRoot } from "./store.js";
 import { listScanFiles, resolveSnapshotId } from "./snapshot.js";
+import type { SessionProviderOptions } from "./session-provider.js";
 
-export interface RuntimeOptions {
+export interface RuntimeOptions extends SessionProviderOptions {
   runId?: string;
   runRoot?: string;
   snapshotId?: string;
@@ -81,27 +88,43 @@ export async function exploreRuntime(
     };
   }
   const probe = loadProbePlan(workspacePath);
-  const session = await openSession();
+  const study = loadStudy(workspacePath);
+  const session = await openSession(context, options);
   try {
     const entryUrl = context.entry_url || project.base_url;
     await session.page.goto(entryUrl, { waitUntil: "domcontentloaded" });
+    const seeds = [
+      ...(study?.entry_seeds ?? []),
+      ...(probe?.entry ? [probe.entry] : []),
+      ...(probe?.target_surface ? [probe.target_surface] : [])
+    ];
+    const urls = await collectProbeUrls(session.page, entryUrl, seeds);
     const discovered = await discoverVisible(session, scope, workspacePath, options, "explore");
-    if (probe?.entry) {
-      const nav = session.page.locator(`[data-seed="${probe.entry}"]`).first();
-      if ((await nav.count()) > 0) {
-        await nav.click();
-        await session.page.waitForLoadState("domcontentloaded");
-        const more = await discoverVisible(session, scope, workspacePath, options, "explore");
-        discovered.candidates.push(...more.candidates);
-        discovered.evidence.push(...more.evidence);
+    const dumped = await dumpPageControls(session, workspacePath, options);
+    for (const url of urls) {
+      if (sameUrl(url, session.page.url())) {
+        continue;
       }
+      await session.page.goto(url, { waitUntil: "domcontentloaded" });
+      const more = await discoverVisible(session, scope, workspacePath, options, "explore");
+      discovered.candidates.push(...more.candidates);
+      discovered.evidence.push(...more.evidence);
+      const extra = await dumpPageControls(session, workspacePath, options);
+      dumped.controls.push(...extra.controls);
+      dumped.evidence.push(...extra.evidence);
     }
     const runRoot = resolveRunRoot(workspacePath, options);
-    const persisted = persistMerged(runRoot, discovered.candidates, [], discovered.evidence);
+    const persisted = persistMerged(
+      runRoot,
+      discovered.candidates,
+      [],
+      [...discovered.evidence, ...dumped.evidence],
+      dumped.controls
+    );
     return {
       status: "success",
       candidates: persisted.candidates,
-      evidence: discovered.evidence,
+      evidence: [...discovered.evidence, ...dumped.evidence],
       observations: [],
       gaps: []
     };
@@ -134,22 +157,18 @@ export async function executeAction(
   if (!workspacePath) {
     return refusedObservation("missing_workspace", "cannot resolve workspace for execute");
   }
-  const study = loadStudy(workspacePath);
-  const probe = loadProbePlan(workspacePath);
-  if (!probe || probe.human_approved !== true) {
-    return refusedObservation("probe_not_approved", "execute send requires human-confirmed probe-plan.yaml");
+  const runRoot = resolveRunRoot(workspacePath, options);
+  if (!action.binding_id) {
+    return failedObservation("binding_missing", "action.binding_id is required");
   }
-  if (study && study.exploration_mode !== "approved_probe") {
-    return refusedObservation("probe_not_approved", "study.exploration_mode must be approved_probe");
+  const binding = loadBindings(runRoot).find((row) => row.binding_id === action.binding_id);
+  if (!binding) {
+    return failedObservation("binding_missing", `binding not found: ${action.binding_id}`);
   }
-  if (!isApprovedSend(action, probe)) {
-    return refusedObservation(
-      "action_not_in_probe",
-      "real send is driven only by human-confirmed probe-plan.yaml"
-    );
+  if (!isPhase1ApprovedLocator(binding.approved_locator)) {
+    return failedObservation("locator_not_found", "phase-1 approved_locator must be accessibility or role+name");
   }
   if (isUnsupportedAction(action)) {
-    const runRoot = resolveRunRoot(workspacePath, options);
     const candidate = markNotExecuted(action, scope, workspacePath, options);
     const persisted = persistMerged(runRoot, candidate ? [candidate] : [], [], []);
     return {
@@ -162,64 +181,50 @@ export async function executeAction(
     };
   }
 
-  const session = await openSession();
+  const probe = loadProbePlan(workspacePath);
+  const session = await openSession(context, options);
   const evidence: EvidenceRecord[] = [];
   const observations: Observation[] = [];
   try {
     const entryUrl = context.entry_url || project.base_url;
     await session.page.goto(entryUrl, { waitUntil: "domcontentloaded" });
     const listBefore = await readCollection(session);
-
-    const nav = session.page.locator(`[data-seed="${probe.entry}"]`).first();
-    if ((await nav.count()) > 0) {
-      await nav.click();
-      await session.page.waitForLoadState("domcontentloaded");
-    }
-
-    const typed = `probe-send-${Date.now().toString(36)}`;
-    const typeBox = session.page.locator("[data-action='type'], textarea, input[type='text']").first();
-    if ((await typeBox.count()) > 0) {
-      await typeBox.fill(typed);
+    const locator = locateApproved(session.page, binding.approved_locator);
+    const found = await locator.count();
+    const visible = found > 0 ? await locator.first().isVisible().catch(() => false) : false;
+    if (found === 0 || !visible) {
+      const miss = evidenceRecord("runtime-execute", {
+        binding_id: binding.binding_id,
+        reason: "locator_not_found",
+        approved_locator: binding.approved_locator
+      });
+      persistMerged(runRoot, [], [], [miss]);
+      return failedObservation("locator_not_found", "approved_locator not found or not visible");
     }
 
     const beforeRequests = session.requests.length;
-    const submit = session.page
-      .locator(
-        action.locator?.value ||
-          `[data-seed="${probe.send_action}"], #${probe.send_action}, [data-control="${probe.send_action}"], [data-action='submit']`
-      )
-      .first();
-    await Promise.all([
-      session.page.waitForResponse((response) => response.url().includes("/send"), { timeout: 5000 }).catch(() => undefined),
-      submit.click()
-    ]);
-    await session.page.waitForFunction(
-      () => {
-        const status = document.getElementById("status");
-        return Boolean(status && status.textContent && status.textContent.includes("已发送"));
-      },
-      { timeout: 5000 }
-    ).catch(() => undefined);
+    await performDeclared(action.action, locator.first(), action.value);
+    await new Promise((resolve) => setTimeout(resolve, 400));
 
-    const currentText = ((await session.page.locator("#status, [data-surface='surface-target']").first().textContent()) ?? "").trim();
+    const currentText = ((await session.page.locator("main, body").first().textContent()) ?? "").trim();
     const currentEv = evidenceRecord("runtime-current", {
-      surface: probe.target_surface,
-      text: currentText.slice(0, 400),
-      typed
+      binding_id: binding.binding_id,
+      surface: action.surface_id || probe?.target_surface,
+      text: currentText.slice(0, 400)
     });
     evidence.push(currentEv);
     observations.push({
       kind: "current_surface",
       observed: Boolean(currentText),
-      display_value: currentText || `typed ${typed}`,
+      display_value: currentText.slice(0, 80) || action.name,
       evidence_refs: [currentEv.id],
-      surface_id: probe.target_surface
+      surface_id: action.surface_id || probe?.target_surface
     });
 
     const newRequests = session.requests.slice(beforeRequests);
     const backend = actualBackendFrom(newRequests, session.page.url());
     if (backend) {
-      const backendEv = evidenceRecord("runtime-backend", backend);
+      const backendEv = evidenceRecord("runtime-backend", { ...backend, binding_id: binding.binding_id });
       evidence.push(backendEv);
       observations.push({
         kind: "backend_operation",
@@ -232,34 +237,36 @@ export async function executeAction(
 
     const pushed = session.websockets.length > 0;
     let otherText = "";
-    let listAfter: string[] = [];
+    let listAfter = await readCollection(session);
+    if (!pushed && listAfter.length === 0) {
+      const refreshUrl = project.base_url || entryUrl;
+      if (!sameUrl(refreshUrl, session.page.url())) {
+        await session.page.goto(refreshUrl, { waitUntil: "domcontentloaded" });
+        listAfter = await readCollection(session);
+      }
+    }
     if (pushed) {
       otherText = "realtime push seen";
     } else {
-      await session.page.goto(entryUrl, { waitUntil: "domcontentloaded" });
-      listAfter = await readCollection(session);
-      otherText = ((await session.page.locator("[data-surface='surface-list'], main").first().textContent()) ?? "").trim();
+      otherText = ((await session.page.locator("[data-surface], main").first().textContent()) ?? "").trim();
     }
     const delta = listAfter.filter((item) => !listBefore.includes(item));
     const otherEv = evidenceRecord("runtime-other", {
+      binding_id: binding.binding_id,
       realtime_push: pushed,
-      refreshed: !pushed,
-      surfaces: probe.other_surfaces_to_refresh,
       list_before: listBefore,
       list_after: listAfter,
       delta,
       text: otherText.slice(0, 400)
     });
     evidence.push(otherEv);
-    const otherObserved = pushed || delta.length > 0 || listAfter.some((item) => item.includes(typed));
+    const otherObserved = pushed || delta.length > 0 || listAfter.length > listBefore.length;
     observations.push({
       kind: "other_surface",
       observed: otherObserved,
-      display_value: otherObserved
-        ? delta[0] || otherText.slice(0, 80) || typed
-        : UNOBSERVED,
+      display_value: otherObserved ? delta[0] || otherText.slice(0, 80) : UNOBSERVED,
       evidence_refs: [otherEv.id],
-      surface_id: probe.other_surfaces_to_refresh[0]
+      surface_id: probe?.other_surfaces_to_refresh[0]
     });
     observations.push({
       kind: "collection",
@@ -271,11 +278,12 @@ export async function executeAction(
     });
 
     const snapshot = resolveSnapshotId(workspacePath, listScanFiles(workspacePath), options.snapshotId);
-    const runRoot = resolveRunRoot(workspacePath, options);
-    const existingSend = loadCandidates(runRoot).find((row) =>
-      row.discovery_key.toLowerCase().includes(probe.send_action.toLowerCase())
+    const existingSend = loadCandidates(runRoot).find(
+      (row) =>
+        row.discovery_key.toLowerCase().includes((probe?.send_action ?? action.id).toLowerCase()) ||
+        row.id === action.id
     );
-    const sendKey = existingSend?.discovery_key ?? `control:${probe.send_action}`;
+    const sendKey = existingSend?.discovery_key ?? `control:${action.id}`;
     const executed: Candidate = {
       schema_version: SCHEMA_VERSION,
       id: existingSend?.id ?? stableCandidateId(snapshot, sendKey),
@@ -288,11 +296,11 @@ export async function executeAction(
       review_status: existingSend?.review_status ?? "unreviewed",
       rejection_reason: null,
       discovery_key: sendKey,
-      label: existingSend?.label ?? action.name ?? probe.send_action
+      label: existingSend?.label ?? action.name
     };
     const interaction: Candidate = {
       schema_version: SCHEMA_VERSION,
-      id: stableCandidateId(snapshot, `interaction:${probe.send_action}`),
+      id: stableCandidateId(snapshot, `interaction:${binding.binding_id}`),
       kind: "interaction",
       scope_id: scope.id,
       discovered_by: "execute",
@@ -301,8 +309,8 @@ export async function executeAction(
       scope_status: "in_scope",
       review_status: "unreviewed",
       rejection_reason: null,
-      discovery_key: `interaction:${probe.send_action}`,
-      label: "probe send"
+      discovery_key: `interaction:${binding.binding_id}`,
+      label: action.name
     };
 
     const persisted = persistMerged(runRoot, [executed, interaction], [], evidence);
@@ -319,12 +327,7 @@ export async function executeAction(
       status: "failed",
       observations,
       evidence,
-      candidates: persistMerged(
-        resolveRunRoot(workspacePath, options),
-        [],
-        [],
-        evidence
-      ).candidates,
+      candidates: persistMerged(runRoot, [], [], evidence).candidates,
       gaps: [
         {
           reason: "execute_failed",
@@ -349,12 +352,59 @@ function refusedObservation(reason: string, message: string): ActionObservation 
   };
 }
 
-function isApprovedSend(action: Control, probe: ProbePlan): boolean {
-  const tokens = [action.id, action.name, action.action, action.locator?.value]
-    .filter(Boolean)
-    .map((value) => String(value).toLowerCase());
-  const send = probe.send_action.toLowerCase();
-  return tokens.some((token) => token.includes(send) || send.includes(token) || token === "submit" || token === "send");
+function failedObservation(reason: string, message: string): ActionObservation {
+  return {
+    status: "failed",
+    observations: [],
+    evidence: [],
+    candidates: [],
+    gaps: [{ reason, message }],
+    cross_actor: CROSS_ACTOR
+  };
+}
+
+async function performDeclared(
+  action: string,
+  locator: import("playwright-core").Locator,
+  value?: string
+): Promise<void> {
+  const kind = action.trim().toLowerCase();
+  if (kind === "type") {
+    await locator.fill(value ?? "");
+    return;
+  }
+  if (kind === "submit" || kind === "click" || kind === "send") {
+    await locator.click();
+    return;
+  }
+  throw new Error(`unsupported declared action: ${action}`);
+}
+
+async function dumpPageControls(
+  session: DriverSession,
+  workspacePath: string,
+  options: RuntimeOptions
+): Promise<{ controls: import("@behavior-map/contracts").ObservedControl[]; evidence: EvidenceRecord[] }> {
+  const snapshot = resolveSnapshotId(workspacePath, listScanFiles(workspacePath), options.snapshotId);
+  const dumped = await dumpVisibleControls(session.page, snapshot);
+  const ev = evidenceRecord("runtime-a11y", {
+    url: session.page.url(),
+    count: dumped.controls.length
+  });
+  return {
+    controls: dumped.controls.map((row) => ({ ...row, evidence_refs: [ev.id] })),
+    evidence: [ev]
+  };
+}
+
+function sameUrl(left: string, right: string): boolean {
+  try {
+    const a = new URL(left);
+    const b = new URL(right);
+    return a.origin === b.origin && a.pathname.replace(/\/$/, "") === b.pathname.replace(/\/$/, "");
+  } catch {
+    return left === right;
+  }
 }
 
 function isUnsupportedAction(action: Control): boolean {

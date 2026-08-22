@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>登录墙</title>
+  </head>
+  <body>
+    <main id="surface-gate" aria-label="登录墙">
+      <h1>登录墙</h1>
+      <form id="gate-form" method="post" action="/login">
+        <label>
+          用户名
+          <input id="gate-user" name="user" type="text" />
+        </label>
+        <label>
+          密码
+          <input id="gate-secret" name="secret" type="password" />
+        </label>
+        <button type="submit" id="gate-submit">进入</button>
+      </form>
+    </main>
+  </body>
+</html>

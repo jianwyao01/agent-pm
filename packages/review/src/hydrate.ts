@@ -3,6 +3,7 @@ import { join } from "node:path";
 import {
   loadReviewedModel,
   readJsonl,
+  type Binding,
   type Candidate,
   type Control,
   type ReviewedModel,
@@ -12,6 +13,11 @@ import {
 export function loadRunCandidates(analysisRoot: string, runId: string): Candidate[] {
   const file = join(analysisRoot, "runs", runId, "candidates.jsonl");
   return existsSync(file) ? readJsonl<Candidate>(file) : [];
+}
+
+export function loadRunBindings(analysisRoot: string, runId: string): Binding[] {
+  const file = join(analysisRoot, "runs", runId, "bindings.jsonl");
+  return existsSync(file) ? readJsonl<Binding>(file) : [];
 }
 
 export function surfacesFromCandidates(candidates: Candidate[]): Surface[] {
@@ -52,7 +58,7 @@ function looksLikeSurface(candidate: Candidate): boolean {
   );
 }
 
-export function controlsFromCandidates(candidates: Candidate[]): Control[] {
+export function controlsFromCandidates(candidates: Candidate[], bindings: Binding[] = []): Control[] {
   const out: Control[] = [];
   const seen = new Set<string>();
   for (const candidate of candidates) {
@@ -64,13 +70,21 @@ export function controlsFromCandidates(candidates: Candidate[]): Control[] {
       continue;
     }
     seen.add(id);
-    const locator = locatorFrom(candidate);
+    const binding = bindingForCandidate(candidate, bindings);
+    const locator = binding
+      ? {
+          kind: binding.approved_locator.type,
+          value: binding.approved_locator.value,
+          reliable: true
+        }
+      : locatorFrom(candidate);
     out.push({
       id,
       surface_id: inferControlSurface(candidate, candidates),
       name: candidate.label,
       action: inferControlAction(candidate),
-      locator
+      locator,
+      ...(binding ? { binding_id: binding.binding_id } : {})
     });
   }
   return out;
@@ -82,11 +96,21 @@ export function hydrateModel(
   model = loadReviewedModel(analysisRoot)
 ): ReviewedModel {
   const candidates = loadRunCandidates(analysisRoot, runId);
+  const bindings = loadRunBindings(analysisRoot, runId);
   return {
     ...model,
     surfaces: surfacesFromCandidates(candidates),
-    controls: controlsFromCandidates(candidates)
+    controls: controlsFromCandidates(candidates, bindings)
   };
+}
+
+function bindingForCandidate(candidate: Candidate, bindings: Binding[]): Binding | undefined {
+  return bindings.find(
+    (row) =>
+      row.control_id === controlIdFrom(candidate) ||
+      candidate.discovery_key.includes(row.control_id) ||
+      candidate.id === row.control_id
+  );
 }
 
 export function surfaceIdFrom(candidate: Candidate): string {

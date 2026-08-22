@@ -14,6 +14,20 @@ export function stableCandidateId(snapshot: string, discoveryKey: string): strin
   return `cand-${digest}`;
 }
 
+/** 同一 snapshot + 同一 surface + 同一 observed role+name 必须得到同一 control_id。 */
+export function stableControlId(
+  snapshot: string,
+  surfaceId: string,
+  role: string,
+  name: string
+): string {
+  const digest = createHash("sha256")
+    .update(`${snapshot}::${surfaceId}::${role}::${name}`)
+    .digest("hex")
+    .slice(0, 16);
+  return `ctl-${digest}`;
+}
+
 /** proposal_id 按 agent task 分配。 */
 export function proposalIdForTask(taskId: string): string {
   return `prop-${taskId}`;

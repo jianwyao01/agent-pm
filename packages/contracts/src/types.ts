@@ -408,6 +408,61 @@ export interface Control {
   name: string;
   action: string;
   locator?: Locator;
+  /** execute 必填：只重放 bindings.jsonl 中的这一条，不读 proposals/。 */
+  binding_id?: string;
+  /** type 动作的输入原文；execute 不猜表单。 */
+  value?: string;
+}
+
+/** controls.jsonl：页面事实。禁止把 send_message / login 等语义猜测写在此对象上。 */
+export type ObservedControlKind = "button" | "input" | "menu" | "other";
+
+export type LocatorCandidateType =
+  | "accessibility"
+  | "role"
+  | "label"
+  | "text"
+  | "css"
+  | "xpath";
+
+export interface LocatorCandidate {
+  type: LocatorCandidateType;
+  value: string;
+}
+
+export interface ObservedFacts {
+  role?: string;
+  name?: string;
+  placeholder?: string;
+  value?: string;
+}
+
+export interface ObservedControl {
+  schema_version: SchemaVersion;
+  control_id: string;
+  surface_id: string;
+  kind: ObservedControlKind;
+  observed: ObservedFacts;
+  locator_candidates: LocatorCandidate[];
+  evidence_refs: string[];
+}
+
+/** Phase-1 approved_locator 只能是 accessibility 或 role+name。 */
+export type ApprovedLocatorType = "accessibility" | "role";
+
+export interface ApprovedLocator {
+  type: ApprovedLocatorType;
+  value: string;
+}
+
+/** bindings.jsonl：人类批准的 locator。禁止语义猜测。execute 只读此文件。 */
+export interface Binding {
+  schema_version: SchemaVersion;
+  binding_id: string;
+  control_id: string;
+  approved_locator: ApprovedLocator;
+  approved_by: "human";
+  created_at: string;
 }
 
 export interface Observation {
