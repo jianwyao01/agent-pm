@@ -29,6 +29,17 @@
         >
           打开创建面
         </button>
+        <button
+          type="button"
+          id="nav-open-info"
+          data-action="click"
+          data-seed="nav-open-info"
+          data-control="nav-info-entry"
+          data-scope-hint="打开信息面"
+          aria-label="打开信息面"
+        >
+          打开信息面
+        </button>
       </nav>
       <form
         id="create-form"
@@ -107,6 +118,9 @@
         const form = document.getElementById("create-form");
         form.hidden = false;
         document.getElementById("create-name").focus();
+      });
+      document.getElementById("nav-open-info").addEventListener("click", () => {
+        location.href = "/info";
       });
       document.getElementById("create-form").addEventListener("submit", async (event) => {
         event.preventDefault();

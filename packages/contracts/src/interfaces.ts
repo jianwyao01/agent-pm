@@ -29,6 +29,7 @@ import type {
  * M8 深化创建域：Journey.entry_url 与可指定 journey_id 的 addJourney；四接口不变。
  * M8c：retarget 重映射残留能力名；四接口不变。
  * M9：HumanReviewSpec.confirmEffects 确认已有六列槽位；四接口不变。
+ * M14：collection 刮取失败不得把已成功的 play 点击打成 execute_failed；四接口不变。
  * boot / discovery 只消费 Workspace + SourceSnapshot，不得依赖 source.kind。
  * 替换 AgentRunner 时，Source / Project / Discovery / Export 代码无需改动。
  */
