@@ -157,20 +157,6 @@ describe("M6 人工审定与四份导出", () => {
     const addedId = first.journeys.find((item) => item.name === "人工补录的同步确认")?.id;
     expect(addedId).toBeDefined();
     expect(first.journeys.find((item) => item.id === addedId)?.status).toBe("accepted");
-    const unsupportedId = "jny-old-unsupported";
-    const seeded = loadReviewedModel(root);
-    writeReviewedModel(root, {
-      ...seeded,
-      journeys: [
-        ...seeded.journeys,
-        {
-          id: unsupportedId,
-          name: "旧的无支持旅程",
-          status: "accepted",
-          effect_ids: []
-        }
-      ]
-    });
     const modelFiles = snapshotModelFiles(root);
 
     const secondSnap = await prepareM5Run(root, "run-002");
@@ -178,14 +164,24 @@ describe("M6 人工审定与四份导出", () => {
     expect(readdirSync(join(root, "runs")).sort()).toEqual(["run-001", "run-002"]);
     expect(snapshotModelFiles(root)["review-decisions.yaml"]).toBe(modelFiles["review-decisions.yaml"]);
 
+    const seeded = loadReviewedModel(root);
+    writeReviewedModel(root, {
+      ...seeded,
+      journeys: seeded.journeys.map((item) => {
+        if (item.id !== addedId) {
+          return item;
+        }
+        const { steps: _steps, ...rest } = item;
+        return { ...rest, control_id: "control-sync-confirm" };
+      })
+    });
+
     const second = applyHumanReview({ analysisRoot: root, runId: "run-002", spec: {} });
     const diff = writeRunDiff({ analysisRoot: root, runId: "run-002" });
 
     expect(second.journeys.find((item) => item.id === "jny-send-001")?.name).toBe(sendName);
     expect(second.journeys.some((item) => item.id === addedId)).toBe(true);
-    expect(second.journeys.find((item) => item.id === addedId)?.status).toBe("accepted");
-    expect(second.journeys.some((item) => item.id === unsupportedId)).toBe(true);
-    expect(second.journeys.find((item) => item.id === unsupportedId)?.status).toMatch(/stale|not_observed/);
+    expect(second.journeys.find((item) => item.id === addedId)?.status).toMatch(/stale|not_observed/);
     expect(second.decisions.map((item) => ({
       candidate_id: item.candidate_id,
       review_status: item.review_status,
@@ -194,9 +190,7 @@ describe("M6 人工审定与四份导出", () => {
       rejection_reason: item.rejection_reason
     }))).toEqual(expect.arrayContaining(decisionsAfterFirst));
     expect(second.decisions.filter((item) => item.review_status === "rejected").length).toBeGreaterThan(0);
-    expect(second.journeys.map((item) => item.id).sort()).toEqual(
-      [...first.journeys.map((item) => item.id), unsupportedId].sort()
-    );
+    expect(second.journeys.map((item) => item.id).sort()).toEqual(first.journeys.map((item) => item.id).sort());
 
     expect(diff.baseline_run_id).toBe("run-001");
     expect(diff.current_run_id).toBe("run-002");
@@ -204,7 +198,7 @@ describe("M6 人工审定与四份导出", () => {
     expect(diff.baseline_source).toBe("previous_completed");
     expect(diff.new_proposals?.length).toBeGreaterThan(0);
     expect(diff.new_proposals?.some((item) => item.proposed_journey_names.includes("发送一条消息"))).toBe(true);
-    expect(diff.missing_support?.some((item) => item.journey_id === unsupportedId)).toBe(true);
+    expect(diff.missing_support?.some((item) => item.journey_id === addedId)).toBe(true);
     expect(validateDocument("diff", diff).ok).toBe(true);
     expect(validateSemantics(root).ok).toBe(true);
   });
