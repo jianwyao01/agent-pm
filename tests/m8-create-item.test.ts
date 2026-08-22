@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   SCHEMA_VERSION,
+  loadReviewedModel,
   scopeFromStudy,
   writeJsonl,
   writeYaml,
@@ -17,7 +18,7 @@ import {
 import { DefaultDiscoveryAdapter, loadControls } from "@behavior-map/discovery";
 import { generateTests } from "@behavior-map/export";
 import { DefaultProjectAdapter } from "@behavior-map/project";
-import { applyHumanReview, hydrateModel, runClosedLoop } from "@behavior-map/review";
+import { applyHumanReview, hydrateModel, runClosedLoop, writeReviewedModel } from "@behavior-map/review";
 import { writePlanFile, writeTrusted, reservePort } from "./helpers/tiny-processes.js";
 import {
   copyTwoSurfaceFixture,
@@ -154,9 +155,12 @@ describe("M8 创建面深化域", () => {
     });
     const journey = added.journeys.find((item) => item.id === CREATE_JOURNEY_ID);
     expect(journey).toBeDefined();
+    expect(journey?.status).toBe("accepted");
     expect(journey?.id).not.toBe("jny-send");
     expect(journey?.name).toBe("创建条目");
     expect(journey?.control_id).toBe("ctl-create-submit");
+    expect(added.capabilities.some((item) => item.name === "发送" || item.id === "cap-send")).toBe(false);
+    expect(added.capabilities.some((item) => item.name === "创建条目")).toBe(true);
     expect(journey?.entry_url).toBe("http://127.0.0.1:4242/");
     expect(journey?.steps).toEqual([
       { binding_id: "bind-create-open", action: "click" },
@@ -438,9 +442,14 @@ describe("M8 创建面深化域", () => {
 
     const journey = closed.model.journeys.find((item) => item.id === CREATE_JOURNEY_ID);
     expect(journey).toBeDefined();
+    expect(journey?.status).toBe("accepted");
     expect(journey?.id).toBe(CREATE_JOURNEY_ID);
     expect(journey?.id).not.toBe("jny-send");
     expect(closed.model.journeys.some((item) => item.id === "jny-send")).toBe(false);
+    expect(closed.model.capabilities.some((item) => item.name === "发送" || item.id === "cap-send")).toBe(
+      false
+    );
+    expect(closed.model.capabilities.some((item) => item.name === "创建条目")).toBe(true);
     expect(journey?.control_id).toBe(submitCreate!.control_id);
     expect(journey?.entry_url).toBe(entryUrl);
     expect(journey?.steps).toEqual([
@@ -469,6 +478,76 @@ describe("M8 创建面深化域", () => {
     expect(spec).not.toContain("about:blank");
   }, 80_000);
 
+  it("同一 applyHumanReview：addJourney/retarget 保持 accepted；候选不必等于 ctl-*-obs；无支持的旧旅程标 stale", () => {
+    const dir = tmp("bm-m8b-obs-");
+    writeCreateStudy(dir);
+    writeCreateProbePlan(dir, "obs-name");
+    writeLiveRunContext(dir, "http://127.0.0.1:4444/");
+    const humanControl = "ctl-9f3c1a2b0d4e5f67-obs";
+    writeJsonl(join(dir, "runs", "run-m8b-obs", "candidates.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        id: "cand-scan-create",
+        kind: "control",
+        scope_id: "scope-new-item",
+        discovered_by: "scan",
+        evidence_refs: [],
+        execution_status: "observed",
+        scope_status: "in_scope",
+        review_status: "unreviewed",
+        rejection_reason: null,
+        discovery_key: "control:public/create.html:control-create-submit",
+        label: "提交创建"
+      }
+    ]);
+    writeJsonl(join(dir, "runs", "run-m8b-obs", "bindings.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        binding_id: "bind-create-submit",
+        control_id: humanControl,
+        approved_locator: { type: "role", value: "button;name=提交创建" },
+        approved_by: "human",
+        created_at: "2026-08-22T00:00:00.000Z"
+      }
+    ]);
+
+    const added = applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m8b-obs",
+      spec: {
+        addJourney: [{ journey_id: CREATE_JOURNEY_ID, control_id: humanControl, name: "创建条目" }]
+      }
+    });
+    const created = added.journeys.find((item) => item.id === CREATE_JOURNEY_ID);
+    expect(created?.status).toBe("accepted");
+    expect(created?.control_id).toBe(humanControl);
+    expect(added.capabilities.some((item) => item.name === "发送")).toBe(false);
+
+    const retargeted = applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m8b-obs",
+      spec: { retarget: [{ journey_id: CREATE_JOURNEY_ID, control_id: humanControl }] }
+    });
+    expect(retargeted.journeys.find((item) => item.id === CREATE_JOURNEY_ID)?.status).toBe("accepted");
+
+    const existing = loadReviewedModel(dir);
+    writeReviewedModel(dir, {
+      ...existing,
+      journeys: [
+        ...existing.journeys,
+        {
+          id: "jny-old-unsupported",
+          name: "旧的无支持旅程",
+          status: "accepted",
+          effect_ids: []
+        }
+      ]
+    });
+    const after = applyHumanReview({ analysisRoot: dir, runId: "run-m8b-obs", spec: {} });
+    expect(after.journeys.find((item) => item.id === CREATE_JOURNEY_ID)?.status).toBe("accepted");
+    expect(after.journeys.find((item) => item.id === "jny-old-unsupported")?.status).toBe("stale");
+  });
+
   it("packages/ 不把产品域名词当核心类型，也不写死创建/发送选择器", () => {
     const packages = join(repoRoot(), "packages");
     for (const file of walkTsJson(packages)) {
@@ -483,5 +562,6 @@ describe("M8 创建面深化域", () => {
       expect(text).not.toMatch(/jny-create-channel/);
     }
     expect(existsSync(join(repoRoot(), "docs/M8.md"))).toBe(true);
+    expect(existsSync(join(repoRoot(), "docs/M8b.md"))).toBe(true);
   });
 });

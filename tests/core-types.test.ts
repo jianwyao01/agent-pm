@@ -3,8 +3,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  SCHEMA_VERSION,
+  collectObservedJourneyIds,
   displayObservations,
   markMissingSupport,
+  type Binding,
+  type Candidate,
   type StartResult
 } from "@behavior-map/contracts";
 
@@ -108,5 +112,78 @@ describe("核心类型边界", () => {
     expect(journeys).toHaveLength(1);
     expect(journeys[0].id).toBe("jny-send-001");
     expect(journeys[0].status).toBe("stale");
+  });
+
+  it("观察：候选 control_id、step binding_id 或 human 绑定任一成立即可，不要求 ctl-*-obs", () => {
+    const journey = {
+      id: "jny-new-item",
+      name: "创建条目",
+      status: "accepted" as const,
+      effect_ids: [],
+      control_id: "ctl-9f3c1a2b0d4e5f67-obs",
+      steps: [{ binding_id: "bind-create-submit", action: "submit" as const }]
+    };
+    const scanCandidate = {
+      schema_version: SCHEMA_VERSION,
+      id: "cand-scan-create",
+      kind: "control" as const,
+      scope_id: "scope-new-item",
+      discovered_by: "scan",
+      evidence_refs: [],
+      execution_status: "observed" as const,
+      scope_status: "in_scope" as const,
+      review_status: "unreviewed" as const,
+      rejection_reason: null,
+      discovery_key: "control:public/create.html:control-create-submit",
+      label: "提交创建"
+    } satisfies Candidate;
+    const playCandidate = {
+      ...scanCandidate,
+      id: "cand-play-create",
+      discovered_by: "play",
+      discovery_key: "interaction:bind-create-submit"
+    } satisfies Candidate;
+    const humanBinding = {
+      schema_version: SCHEMA_VERSION,
+      binding_id: "bind-create-submit",
+      control_id: "ctl-9f3c1a2b0d4e5f67-obs",
+      approved_locator: { type: "role" as const, value: "button;name=提交创建" },
+      approved_by: "human" as const,
+      created_at: "2026-08-22T00:00:00.000Z"
+    } satisfies Binding;
+
+    expect(
+      collectObservedJourneyIds([journey], {
+        candidates: [scanCandidate],
+        bindings: []
+      })
+    ).toEqual([]);
+    expect(
+      collectObservedJourneyIds([{ ...journey, control_id: "control-create-submit" }], {
+        candidates: [scanCandidate],
+        bindings: []
+      })
+    ).toEqual(["jny-new-item"]);
+    expect(
+      collectObservedJourneyIds([journey], {
+        candidates: [playCandidate],
+        bindings: []
+      })
+    ).toEqual(["jny-new-item"]);
+    expect(
+      collectObservedJourneyIds([journey], {
+        candidates: [],
+        bindings: [humanBinding]
+      })
+    ).toEqual(["jny-new-item"]);
+    expect(
+      collectObservedJourneyIds(
+        [
+          journey,
+          { id: "jny-old-unsupported", name: "旧旅程", status: "accepted", effect_ids: [] }
+        ],
+        { candidates: [playCandidate], bindings: [humanBinding], alwaysObservedIds: ["jny-new-item"] }
+      )
+    ).toEqual(["jny-new-item"]);
   });
 });
