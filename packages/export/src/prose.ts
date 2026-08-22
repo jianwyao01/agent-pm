@@ -35,16 +35,17 @@ export function renderProductMapProse(model: ReviewedModel): string {
       lines.push(`- 表面 \`${surface.id}\`：界面原文「${surface.name}」`);
     }
   }
-  lines.push("", "## 发送控件", "");
+  const stem = mapHeadingStem(model);
+  lines.push("", `## ${stem}控件`, "");
   const controls = sendControls.length > 0 ? sendControls : model.controls;
   if (controls.length === 0) {
-    lines.push("- 已审定旅程引用了发送控件；界面原文见目标应用。");
+    lines.push(`- 已审定旅程引用了${stem}控件；界面原文见目标应用。`);
   } else {
     for (const control of controls) {
       lines.push(controlLine(control));
     }
   }
-  lines.push("", "## 已接受的发送旅程", "");
+  lines.push("", `## 已接受的${stem}旅程`, "");
   const sendJourneys = accepted.length > 0 ? accepted : model.journeys;
   for (const journey of sendJourneys) {
     lines.push(`- 旅程 ID：\`${journey.id}\`（重命名不改此 ID）`);
@@ -70,6 +71,33 @@ export function renderProductMapProse(model: ReviewedModel): string {
   }
   lines.push(effectNotes(model.effects, model.surfaces));
   return `${lines.join("\n")}\n`;
+}
+
+function mapHeadingStem(model: ReviewedModel): string {
+  const accepted = model.journeys.filter((journey) => journey.status === "accepted");
+  const pool = accepted.length > 0 ? accepted : model.journeys;
+  if (pool.some(isSendNamedJourney)) {
+    return "发送";
+  }
+  for (const journey of pool) {
+    const cap = model.capabilities.find(
+      (item) => journey.control_id !== undefined && item.control_ids.includes(journey.control_id)
+    );
+    if (cap && cap.name !== "发送") {
+      return cap.name;
+    }
+  }
+  const named = pool.find((journey) => journey.name.trim());
+  if (named) {
+    return named.name;
+  }
+  const derived = model.capabilities.find((item) => item.name !== "发送");
+  return derived?.name ?? "旅程";
+}
+
+function isSendNamedJourney(journey: Journey): boolean {
+  const text = `${journey.id} ${journey.name}`;
+  return /发送/.test(text) || /(?:^|-)send(?:-|$)/i.test(journey.id.replace(/^jny-/, ""));
 }
 
 function controlLine(control: Control): string {
