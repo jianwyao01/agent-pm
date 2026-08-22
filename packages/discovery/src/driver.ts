@@ -1,9 +1,12 @@
-import { chromium, type Browser, type Page } from "playwright-core";
+import { chromium, type Browser, type BrowserContext, type Page } from "playwright-core";
+import type { RunContext } from "@behavior-map/contracts";
+import { createContext, type SessionProviderOptions } from "./session-provider.js";
 
 const CHROME_PATHS = ["/usr/local/bin/google-chrome", "/usr/bin/google-chrome", "/usr/bin/chromium"];
 
 export interface DriverSession {
   browser: Browser;
+  context: BrowserContext;
   page: Page;
   requests: CapturedRequest[];
   websockets: string[];
@@ -15,9 +18,15 @@ export interface CapturedRequest {
   resourceType: string;
 }
 
-export async function openSession(): Promise<DriverSession> {
+export async function openSession(
+  runContext?: Pick<RunContext, "credential_ref" | "cookie_ref">,
+  sessionOptions: SessionProviderOptions = {}
+): Promise<DriverSession> {
   const browser = await launchBrowser();
-  const page = await browser.newPage();
+  const context = runContext
+    ? await createContext(browser, runContext, sessionOptions)
+    : await browser.newContext();
+  const page = await context.newPage();
   const requests: CapturedRequest[] = [];
   const websockets: string[] = [];
   page.on("request", (request) => {
@@ -30,7 +39,7 @@ export async function openSession(): Promise<DriverSession> {
   page.on("websocket", (socket) => {
     websockets.push(socket.url());
   });
-  return { browser, page, requests, websockets };
+  return { browser, context, page, requests, websockets };
 }
 
 export async function closeSession(session: DriverSession | undefined): Promise<void> {

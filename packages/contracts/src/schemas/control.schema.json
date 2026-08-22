@@ -1,0 +1,47 @@
+{
+  "$id": "https://behavior-map.dev/schemas/control.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "observed-control",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "control_id",
+    "surface_id",
+    "kind",
+    "observed",
+    "locator_candidates",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "control_id": { "type": "string", "minLength": 1 },
+    "surface_id": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["button", "input", "menu", "other"] },
+    "observed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "role": { "type": "string" },
+        "name": { "type": "string" },
+        "placeholder": { "type": "string" },
+        "value": { "type": "string" }
+      }
+    },
+    "locator_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "value"],
+        "properties": {
+          "type": {
+            "enum": ["accessibility", "role", "label", "text", "css", "xpath"]
+          },
+          "value": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "evidence_refs": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+  }
+}

@@ -1,7 +1,8 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { listRunIds, loadReviewedModel, readJson, readJsonl } from "./io.js";
 import type {
+  Binding,
   Candidate,
   DiffFile,
   EvidenceRecord,
@@ -53,6 +54,17 @@ function collectCandidates(analysisRoot: string): Candidate[] {
     const file = join(analysisRoot, "runs", runId, "candidates.jsonl");
     if (existsSync(file)) {
       rows.push(...readJsonl<Candidate>(file));
+    }
+  }
+  return rows;
+}
+
+function collectBindings(analysisRoot: string): Binding[] {
+  const rows: Binding[] = [];
+  for (const runId of listRunIds(analysisRoot)) {
+    const file = join(analysisRoot, "runs", runId, "bindings.jsonl");
+    if (existsSync(file)) {
+      rows.push(...readJsonl<Binding>(file));
     }
   }
   return rows;
@@ -239,6 +251,74 @@ export function validateSemantics(analysisRoot: string): SemanticReport {
     checkRefs(effect.observation.evidence_refs, join(analysisRoot, "model", "effects.yaml"));
   }
 
+  const bindings = collectBindings(analysisRoot);
+  const bindingsById = new Map(bindings.map((row) => [row.binding_id, row]));
+
+  for (const runId of listRunIds(analysisRoot)) {
+    const runtimeFile = join(analysisRoot, "runs", runId, "evidence", "runtime.jsonl");
+    if (existsSync(runtimeFile)) {
+      for (const [index, row] of readJsonl<EvidenceRecord>(runtimeFile).entries()) {
+        const bindingId = row.payload?.binding_id;
+        if (typeof bindingId === "string" && bindingId.length > 0 && !bindingsById.has(bindingId)) {
+          issues.push({
+            code: "missing_binding_ref",
+            message: `execute 产物引用了不存在的 binding_id ${bindingId}`,
+            path: `${runtimeFile}:${index + 1}`
+          });
+        }
+      }
+    }
+
+    const controlsFile = join(analysisRoot, "runs", runId, "controls.jsonl");
+    if (existsSync(controlsFile)) {
+      for (const [index, row] of readJsonl<Record<string, unknown>>(controlsFile).entries()) {
+        if (hasSemanticGuess(row)) {
+          issues.push({
+            code: "semantic_guess_on_control",
+            message: "controls.jsonl 只允许页面事实，禁止 send_message / login 等语义猜测",
+            path: `${controlsFile}:${index + 1}`
+          });
+        }
+      }
+    }
+
+    const bindingsFile = join(analysisRoot, "runs", runId, "bindings.jsonl");
+    if (existsSync(bindingsFile)) {
+      for (const [index, row] of readJsonl<Record<string, unknown>>(bindingsFile).entries()) {
+        if (hasSemanticGuess(row)) {
+          issues.push({
+            code: "semantic_guess_on_binding",
+            message: "bindings.jsonl 禁止语义猜测",
+            path: `${bindingsFile}:${index + 1}`
+          });
+        }
+      }
+    }
+  }
+
+  const specFile = join(analysisRoot, "generated", "tests", "journeys.spec.ts");
+  if (existsSync(specFile) && bindings.length > 0) {
+    const spec = readFileSync(specFile, "utf8");
+    if (/getByRole|page\.locator\(/.test(spec)) {
+      const approvedInSpec = bindings.some((row) => spec.includes(row.approved_locator.value));
+      if (!approvedInSpec) {
+        issues.push({
+          code: "generated_locator_mismatch",
+          message: "generated test locator 必须等于 approved_locator",
+          path: specFile
+        });
+      }
+      const fallbackSend = bindings.some((row) => row.approved_locator.value.includes("#control-send"));
+      if (spec.includes("#control-send") && !fallbackSend) {
+        issues.push({
+          code: "generated_locator_mismatch",
+          message: "generated test locator 不得回退 #control-send",
+          path: specFile
+        });
+      }
+    }
+  }
+
   const generatedDir = join(analysisRoot, "generated");
   if (existsSync(generatedDir)) {
     const manifests = readExportManifests(analysisRoot);
@@ -337,6 +417,8 @@ export function approvedReadsForRun(runId: string): string[] {
     `runs/${runId}/run-context.yaml`,
     `runs/${runId}/status.json`,
     `runs/${runId}/candidates.jsonl`,
+    `runs/${runId}/controls.jsonl`,
+    `runs/${runId}/bindings.jsonl`,
     `runs/${runId}/evidence/static.jsonl`,
     `runs/${runId}/evidence/runtime.jsonl`,
     "model/capabilities.yaml",
@@ -346,4 +428,9 @@ export function approvedReadsForRun(runId: string): string[] {
   ];
 }
 
-export { collectCandidates, collectEvidence, collectProposals, isGeneratedPath };
+function hasSemanticGuess(row: Record<string, unknown>): boolean {
+  const forbiddenKeys = ["intent", "semantic", "guess", "purpose", "meaning", "send_message", "login"];
+  return forbiddenKeys.some((key) => key in row);
+}
+
+export { collectCandidates, collectBindings, collectEvidence, collectProposals, isGeneratedPath };

@@ -9,6 +9,27 @@ const publicDir = path.join(__dirname, "public");
 
 const items = [{ id: "seed-1", text: "已有条目" }];
 let seq = 1;
+let loginPosted = false;
+
+function cookiesOf(req) {
+  return String(req.headers.cookie || "")
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function isAuthed(req) {
+  return cookiesOf(req).some((part) => part === "bm_session=ok");
+}
+
+function needsAuth(pathname) {
+  return (
+    pathname !== "/health" &&
+    pathname !== "/login" &&
+    pathname !== "/debug/login-posted" &&
+    pathname !== "/api/items"
+  );
+}
 
 function sendJson(res, status, body) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
@@ -48,11 +69,34 @@ const server = http.createServer(async (req, res) => {
     res.end("ok");
     return;
   }
+  if (url.pathname === "/debug/login-posted") {
+    sendJson(res, 200, { posted: loginPosted });
+    return;
+  }
+  if (url.pathname === "/login") {
+    if (req.method === "POST") {
+      loginPosted = true;
+      fs.writeFileSync(path.join(__dirname, "login-posted.flag"), "1");
+      sendJson(res, 200, { ok: false, message: "fixture login is not used by execute" });
+      return;
+    }
+    sendFile(res, path.join(publicDir, "login.html"), "text/html; charset=utf-8");
+    return;
+  }
+  if (needsAuth(url.pathname) && !isAuthed(req) && req.method === "GET") {
+    res.writeHead(302, { location: "/login" });
+    res.end();
+    return;
+  }
   if (url.pathname === "/api/items") {
     sendJson(res, 200, items);
     return;
   }
   if (url.pathname === "/send" && req.method === "POST") {
+    if (!isAuthed(req)) {
+      sendJson(res, 401, { ok: false });
+      return;
+    }
     const body = await parseBody(req);
     const text = String(body.text || "").trim();
     if (text) {

@@ -32,7 +32,9 @@ export type FileKind =
   | "review-decisions"
   | "product-map"
   | "export-manifest"
-  | "agent-task";
+  | "agent-task"
+  | "control"
+  | "binding";
 
 const SCHEMAS: Record<FileKind, object> = {
   study: loadSchema("study.schema.json"),
@@ -53,7 +55,9 @@ const SCHEMAS: Record<FileKind, object> = {
   "review-decisions": loadSchema("review-decisions.schema.json"),
   "product-map": loadSchema("product-map.schema.json"),
   "export-manifest": loadSchema("export-manifest.schema.json"),
-  "agent-task": loadSchema("agent-task.schema.json")
+  "agent-task": loadSchema("agent-task.schema.json"),
+  control: loadSchema("control.schema.json"),
+  binding: loadSchema("binding.schema.json")
 };
 
 export interface StructuralIssue {
@@ -281,6 +285,20 @@ export function validateAnalysisTree(analysisRoot: string): StructuralReport {
       } else {
         for (const [index, row] of readJsonl(candidates).entries()) {
           issues.push(...validateDocument("candidate", row, `${candidates}:${index + 1}`).issues);
+        }
+      }
+
+      const controls = join(runDir, "controls.jsonl");
+      if (existsSync(controls)) {
+        for (const [index, row] of readJsonl(controls).entries()) {
+          issues.push(...validateDocument("control", row, `${controls}:${index + 1}`).issues);
+        }
+      }
+
+      const bindings = join(runDir, "bindings.jsonl");
+      if (existsSync(bindings)) {
+        for (const [index, row] of readJsonl(bindings).entries()) {
+          issues.push(...validateDocument("binding", row, `${bindings}:${index + 1}`).issues);
         }
       }
 
