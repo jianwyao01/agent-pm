@@ -238,18 +238,22 @@ describe("M4b Control / Binding / SessionProvider", () => {
     const executed = await discovery.execute(project, lateContext, boundSubmitAction(binding));
     expect(executed.status).toBe("success");
 
-    const itemsAfterWait = await fetch(`http://127.0.0.1:${appPort}/api/items`).then((res) => res.json());
+    const itemsAfterWait = (await fetch(`http://127.0.0.1:${appPort}/api/items`).then((res) =>
+      res.json()
+    )) as Array<{ text: string }>;
     expect(itemsAfterWait.length).toBeGreaterThan(itemsBefore.length);
-    expect(itemsAfterWait.some((item) => String(item.text).includes("decoy-fallback"))).toBe(false);
+    expect(itemsAfterWait.some((item) => item.text.includes("decoy-fallback"))).toBe(false);
 
     const neverContext = fixtureContext(dir, `http://127.0.0.1:${appPort}/compose-late?paint=never`);
     const missed = await discovery.execute(project, neverContext, boundSubmitAction(binding));
     expect(["failed", "unreachable"]).toContain(missed.status);
     expect(missed.gaps.some((gap) => gap.reason === "locator_not_found")).toBe(true);
 
-    const itemsAfterMiss = await fetch(`http://127.0.0.1:${appPort}/api/items`).then((res) => res.json());
+    const itemsAfterMiss = (await fetch(`http://127.0.0.1:${appPort}/api/items`).then((res) =>
+      res.json()
+    )) as Array<{ text: string }>;
     expect(itemsAfterMiss).toHaveLength(itemsAfterWait.length);
-    expect(itemsAfterMiss.some((item) => String(item.text).includes("decoy-fallback"))).toBe(false);
+    expect(itemsAfterMiss.some((item) => item.text.includes("decoy-fallback"))).toBe(false);
 
     const loginPosted = await fetch(`http://127.0.0.1:${appPort}/debug/login-posted`).then((res) => res.json());
     expect(loginPosted.posted).toBe(false);
