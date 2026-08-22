@@ -36,7 +36,7 @@
         "required": ["type", "value"],
         "properties": {
           "type": {
-            "enum": ["accessibility", "role", "label", "text", "css", "xpath"]
+            "enum": ["accessibility", "role", "label", "title", "text", "css", "xpath"]
           },
           "value": { "type": "string", "minLength": 1 }
         }

@@ -90,6 +90,19 @@
       >
         话题串
       </button>
+      <button
+        type="button"
+        id="control-open-item"
+        data-action="click"
+        data-seed="nav-open-item"
+        data-control="nav-icon-item"
+        title="Open item"
+        aria-label="&#xe000;"
+        style="width: 32px; height: 32px"
+      >
+        &#xe000;
+      </button>
+      <p id="open-item-status" hidden></p>
       <div id="gesture-swipe" data-gesture="swipe" data-control="gesture-swipe" aria-label="swipe">
         swipe
       </div>
@@ -121,6 +134,13 @@
       });
       document.getElementById("nav-open-info").addEventListener("click", () => {
         location.href = "/info";
+      });
+      document.getElementById("control-open-item").addEventListener("click", () => {
+        const status = document.getElementById("open-item-status");
+        if (status) {
+          status.hidden = false;
+          status.textContent = "opened";
+        }
       });
       document.getElementById("create-form").addEventListener("submit", async (event) => {
         event.preventDefault();

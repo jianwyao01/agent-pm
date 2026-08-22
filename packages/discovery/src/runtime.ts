@@ -188,7 +188,10 @@ export async function executeAction(
     return failedObservation("binding_missing", `binding not found: ${action.binding_id}`);
   }
   if (!isPhase1ApprovedLocator(binding.approved_locator)) {
-    return failedObservation("locator_not_found", "phase-1 approved_locator must be accessibility or role+name");
+    return failedObservation(
+      "locator_not_found",
+      "phase-1 approved_locator must be accessibility, role+name, title, or label"
+    );
   }
   if (isUnsupportedAction(action)) {
     const candidate = markNotExecuted(action, scope, workspacePath, options);

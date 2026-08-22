@@ -106,6 +106,12 @@ function playwrightCall(kind: string | undefined, locator: string, action = "cli
       return `await page.getByRole(${JSON.stringify(roleName[1].trim())}, { name: ${JSON.stringify(roleName[2].trim())} })${suffix}; // ${JSON.stringify(locator)}`;
     }
   }
+  if (kind === "title") {
+    return `await page.getByTitle(${JSON.stringify(locator)}, { exact: true })${suffix}; // ${JSON.stringify(locator)}`;
+  }
+  if (kind === "label") {
+    return `await page.getByLabel(${JSON.stringify(locator)}, { exact: true })${suffix}; // ${JSON.stringify(locator)}`;
+  }
   return `await page.locator(${JSON.stringify(locator)})${suffix};`;
 }
 
