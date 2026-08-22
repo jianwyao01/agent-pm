@@ -93,6 +93,7 @@ export function controlsFromCandidates(candidates: Candidate[], bindings: Bindin
 /**
  * 只把 bindings.jsonl 里的 approved_locator 挂到 control 上。
  * 不得改写 journey.control_id，不得发明 retarget，不得发明 entry_url。
+ * 不得发明 observation。
  */
 export function hydrateModel(
   analysisRoot: string,

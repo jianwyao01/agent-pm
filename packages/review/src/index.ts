@@ -4,6 +4,7 @@ export {
   writeReviewedModel,
   type AddedJourneySpec,
   type ApplyHumanReviewOptions,
+  type ConfirmEffectSpec,
   type HumanReviewSpec,
   type KeepJourneySpec,
   type RejectSpec,

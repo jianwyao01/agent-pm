@@ -662,6 +662,7 @@ export interface DisplayProjection {
 }
 
 export const UNOBSERVED = "未观察到";
+export const OBSERVED = "观察到";
 
 export const DISPLAY_COLUMNS = [
   { observation_kind: "current_surface" as const, label: "本面" },

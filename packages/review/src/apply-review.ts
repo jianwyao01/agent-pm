@@ -11,10 +11,12 @@ import {
   readYaml,
   validateDocument,
   writeYaml,
+  readJsonl,
   type Binding,
   type Candidate,
   type Capability,
   type Effect,
+  type EvidenceRecord,
   type Journey,
   type JourneyStep,
   type ObservationKind,
@@ -63,9 +65,18 @@ export interface RetargetSpec {
   control_id: string;
 }
 
+export interface ConfirmEffectSpec {
+  journey_id: string;
+  effect_id: string;
+  evidence_ref: string;
+  /** 人类点名的可见项。有非空值时直接写入 observation.display_value。 */
+  display_value?: string;
+}
+
 /**
  * 人类审定输入。可 keep / reject / rename，并可补录一条其认为有效的旅程。
  * retarget 必须显式给出；hydrateModel 不得发明重定位。
+ * confirmEffects 只确认已有六列槽位与本 run 已有 evidence，不得猜测。
  */
 export interface HumanReviewSpec {
   keep?: KeepJourneySpec[];
@@ -74,6 +85,7 @@ export interface HumanReviewSpec {
   /** 锁定形状为数组；兼容 M0–M7 的单个对象。 */
   addJourney?: AddedJourneySpec | AddedJourneySpec[];
   retarget?: RetargetSpec[];
+  confirmEffects?: ConfirmEffectSpec[];
 }
 
 export interface ApplyHumanReviewOptions {
@@ -162,6 +174,11 @@ export function applyHumanReview(options: ApplyHumanReviewOptions): ReviewedMode
   for (const retarget of spec.retarget ?? []) {
     applyRetarget(retarget, journeys, bindings, probePlan, runContext, capabilities);
     justTouched.add(retarget.journey_id);
+  }
+
+  const runEvidence = loadRunEvidence(analysisRoot, runId);
+  for (const confirmed of spec.confirmEffects ?? []) {
+    applyConfirmEffect(confirmed, journeys, effects, runEvidence);
   }
 
   const observedIds = collectObservedJourneyIds(journeys, {
@@ -447,6 +464,72 @@ function applyRetarget(
   }
   rewriteLeftoverSendCapabilities(capabilities, journey);
   ensureJourneyCapability(capabilities, journey);
+}
+
+function applyConfirmEffect(
+  spec: ConfirmEffectSpec,
+  journeys: Journey[],
+  effects: Effect[],
+  evidence: EvidenceRecord[]
+): void {
+  const journey = journeys.find((item) => item.id === spec.journey_id);
+  if (!journey) {
+    throw new Error(`确认效果失败：不存在旅程 ${spec.journey_id}`);
+  }
+  const effect = effects.find((item) => item.id === spec.effect_id);
+  if (!effect) {
+    throw new Error(`确认效果失败：不存在效果 ${spec.effect_id}`);
+  }
+  const record = evidence.find((item) => item.id === spec.evidence_ref);
+  if (!record) {
+    throw new Error(`确认效果失败：本 run 没有 evidence_ref ${spec.evidence_ref}`);
+  }
+  const named = spec.display_value?.trim();
+  const display = named ? named : displayValueFromEvidence(record);
+  effect.observation.observed = true;
+  effect.observation.display_value = display;
+  if (!effect.observation.evidence_refs.includes(spec.evidence_ref)) {
+    effect.observation.evidence_refs.push(spec.evidence_ref);
+  }
+  if (!journey.effect_ids.includes(spec.effect_id)) {
+    journey.effect_ids.push(spec.effect_id);
+  }
+}
+
+function displayValueFromEvidence(record: EvidenceRecord): string {
+  const payload = record.payload ?? {};
+  for (const key of ["name", "label", "item", "title"] as const) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  if (Array.isArray(payload.delta)) {
+    const first = payload.delta.find((item) => typeof item === "string" && item.trim());
+    if (typeof first === "string") {
+      return first.trim();
+    }
+  }
+  if (Array.isArray(payload.list_after)) {
+    const named = payload.list_after.filter((item) => typeof item === "string" && item.trim());
+    const last = named.at(-1);
+    if (typeof last === "string") {
+      return last.trim();
+    }
+  }
+  throw new Error(`确认效果失败：evidence ${record.id} 没有可展示的名称`);
+}
+
+function loadRunEvidence(analysisRoot: string, runId: string): EvidenceRecord[] {
+  const runRoot = join(analysisRoot, "runs", runId);
+  const out: EvidenceRecord[] = [];
+  for (const name of ["static.jsonl", "runtime.jsonl"] as const) {
+    const file = join(runRoot, "evidence", name);
+    if (existsSync(file)) {
+      out.push(...readJsonl<EvidenceRecord>(file));
+    }
+  }
+  return out;
 }
 
 function assertHumanBinding(bindings: Binding[], controlId: string, action: string): void {

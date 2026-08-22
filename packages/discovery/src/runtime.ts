@@ -516,9 +516,27 @@ async function discoverVisible(
 }
 
 async function readCollection(session: DriverSession): Promise<string[]> {
-  return session.page.$$eval("[data-item-id], #item-list li", (nodes) =>
-    nodes.map((node) => (node.textContent ?? "").trim()).filter(Boolean)
-  );
+  const names: string[] = [];
+  const seen = new Set<string>();
+  const add = (value: string): void => {
+    const name = value.trim();
+    if (!name || seen.has(name)) {
+      return;
+    }
+    seen.add(name);
+    names.push(name);
+  };
+  for (const role of ["listitem", "link"] as const) {
+    const locators = session.page.getByRole(role);
+    const count = await locators.count();
+    for (let index = 0; index < count; index += 1) {
+      const node = locators.nth(index);
+      const labeled = ((await node.getAttribute("aria-label")) ?? "").trim();
+      const text = ((await node.innerText()) ?? "").trim();
+      add(labeled || text);
+    }
+  }
+  return names;
 }
 
 function evidenceRecord(kind: string, payload: Record<string, unknown>): EvidenceRecord {

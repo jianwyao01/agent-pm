@@ -1,4 +1,5 @@
 import {
+  OBSERVED,
   UNOBSERVED,
   projectDisplay,
   type Control,
@@ -64,7 +65,7 @@ export function renderProductMapProse(model: ReviewedModel): string {
     lines.push(`### ${row.journey_id}`);
     lines.push("");
     for (const cell of row.cells) {
-      const note = cell.observed ? cell.value : UNOBSERVED;
+      const note = cell.observed ? OBSERVED : UNOBSERVED;
       lines.push(`- ${cell.column}：${note}`);
     }
     lines.push("");

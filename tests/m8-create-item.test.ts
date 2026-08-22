@@ -4,11 +4,15 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  OBSERVED,
   SCHEMA_VERSION,
+  UNOBSERVED,
   loadReviewedModel,
+  readJsonl,
   scopeFromStudy,
   writeJsonl,
   writeYaml,
+  type EvidenceRecord,
   type ProbePlan,
   type RunningProject,
   type RunContext,
@@ -60,6 +64,7 @@ function walkTsJson(dir: string): string[] {
 }
 
 const CREATE_JOURNEY_ID = "jny-new-item";
+const LIST_EFFECT_ID = "eff-collection-list";
 
 function writeCreateStudy(dir: string): Study {
   const study: Study = {
@@ -483,6 +488,47 @@ describe("M8 创建面深化域", () => {
     expect(mapMd).toContain("## 已接受的创建条目旅程");
     expect(mapMd).not.toMatch(/## 发送控件/);
     expect(mapMd).not.toMatch(/已接受的发送旅程/);
+
+    const playedNames = closed.played.flatMap((row) =>
+      row.evidence.flatMap((item) => {
+        const payload = item.payload ?? {};
+        const listed = [
+          ...(Array.isArray(payload.list_after) ? payload.list_after : []),
+          ...(Array.isArray(payload.delta) ? payload.delta : [])
+        ];
+        return listed.map((value) => String(value));
+      })
+    );
+    expect(playedNames.some((name) => name.includes(unique))).toBe(true);
+
+    const runtime = readJsonl<EvidenceRecord>(join(runRoot, "evidence", "runtime.jsonl"));
+    const named = runtime.find((row) => JSON.stringify(row.payload ?? {}).includes(unique));
+    expect(named).toBeDefined();
+    const confirmed = applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m8",
+      spec: {
+        confirmEffects: [
+          {
+            journey_id: CREATE_JOURNEY_ID,
+            effect_id: LIST_EFFECT_ID,
+            evidence_ref: named!.id,
+            display_value: unique
+          }
+        ]
+      }
+    });
+    const listEffect = confirmed.effects.find((item) => item.id === LIST_EFFECT_ID);
+    expect(listEffect?.observation.observed).toBe(true);
+    expect(listEffect?.observation.display_value).toContain(unique);
+    expect(
+      confirmed.effects.filter(
+        (item) => item.observation.kind === "collection" && item.observation.subtype === "list"
+      )
+    ).toHaveLength(1);
+    generateAll(confirmed, dir);
+    const confirmedMap = readFileSync(join(dir, "generated/product-map/product-map.md"), "utf8");
+    expect(confirmedMap).toMatch(new RegExp(`列表：${OBSERVED}`));
   }, 80_000);
 
   it("retarget 重写挂在该 control_id 上的 leftover cap-send；能力名不是 发送；旅程 accepted；地图标题跟随能力名", () => {
@@ -734,9 +780,255 @@ describe("M8 创建面深化域", () => {
       expect(text).not.toMatch(/aria-label\s*=\s*Send\b/);
       expect(text).not.toMatch(/create-surface/);
       expect(text).not.toMatch(/jny-create-channel/);
+      expect(text).not.toMatch(/data-item-id/);
+      expect(text).not.toMatch(/#item-list/);
     }
     expect(existsSync(join(repoRoot(), "docs/M8.md"))).toBe(true);
     expect(existsSync(join(repoRoot(), "docs/M8b.md"))).toBe(true);
     expect(existsSync(join(repoRoot(), "docs/M8c.md"))).toBe(true);
+    expect(existsSync(join(repoRoot(), "docs/M9.md"))).toBe(true);
+  });
+
+  it("未观察列表 + 点名条目的 evidence，confirmEffects 后 observed、display 是名称、地图写观察到", () => {
+    const dir = tmp("bm-m9-confirm-");
+    writeCreateStudy(dir);
+    writeCreateProbePlan(dir, "item-alpha");
+    writeLiveRunContext(dir, "http://127.0.0.1:4747/");
+    writeJsonl(join(dir, "runs", "run-m9", "bindings.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        binding_id: "bind-create-submit",
+        control_id: "ctl-create-submit",
+        approved_locator: { type: "role", value: "button;name=提交创建" },
+        approved_by: "human",
+        created_at: "2026-08-22T00:00:00.000Z"
+      }
+    ]);
+    writeJsonl(join(dir, "runs", "run-m9", "evidence", "runtime.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        id: "ev-named-item",
+        immutable: true,
+        source: "runtime",
+        kind: "runtime-other",
+        payload: { name: "item-alpha" }
+      }
+    ]);
+
+    const added = applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m9",
+      spec: {
+        addJourney: [{ journey_id: CREATE_JOURNEY_ID, control_id: "ctl-create-submit", name: "创建条目" }]
+      }
+    });
+    const stub = added.effects.find((item) => item.id === LIST_EFFECT_ID);
+    expect(stub?.observation.observed).toBe(false);
+    expect(stub?.observation.display_value).toBe(UNOBSERVED);
+
+    const confirmed = applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m9",
+      spec: {
+        confirmEffects: [
+          { journey_id: CREATE_JOURNEY_ID, effect_id: LIST_EFFECT_ID, evidence_ref: "ev-named-item" }
+        ]
+      }
+    });
+    const list = confirmed.effects.find((item) => item.id === LIST_EFFECT_ID);
+    expect(list?.observation.observed).toBe(true);
+    expect(list?.observation.display_value).toBe("item-alpha");
+    expect(list?.observation.evidence_refs).toContain("ev-named-item");
+    expect(
+      confirmed.effects.filter(
+        (item) => item.observation.kind === "collection" && item.observation.subtype === "list"
+      )
+    ).toHaveLength(1);
+
+    const hydrated = hydrateModel(dir, "run-m9", confirmed);
+    expect(hydrated.effects.find((item) => item.id === LIST_EFFECT_ID)?.observation.observed).toBe(true);
+    expect(hydrated.effects.find((item) => item.id === LIST_EFFECT_ID)?.observation.display_value).toBe(
+      "item-alpha"
+    );
+
+    generateAll(confirmed, dir);
+    const mapMd = readFileSync(join(dir, "generated/product-map/product-map.md"), "utf8");
+    expect(mapMd).toMatch(new RegExp(`列表：${OBSERVED}`));
+    expect(mapMd).not.toMatch(new RegExp(`列表：${UNOBSERVED}`));
+  });
+
+  it("发送旅程不写 confirmEffects 时列表仍为未观察到", () => {
+    const dir = tmp("bm-m9-send-");
+    writeYaml(join(dir, "study.yaml"), {
+      schema_version: SCHEMA_VERSION,
+      id: "study-message",
+      name: "发送一条消息",
+      goal: "发送",
+      entry_seeds: ["nav-tree"],
+      include_hints: ["发送一条消息"],
+      exclude_hints: [],
+      exploration_mode: "approved_probe"
+    });
+    writeCreateProbePlan(dir, "send-keep");
+    writeLiveRunContext(dir, "http://127.0.0.1:4848/");
+    writeJsonl(join(dir, "runs", "run-m9-send", "bindings.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        binding_id: "bind-send",
+        control_id: "ctl-send",
+        approved_locator: { type: "role", value: "button;name=发送一条消息" },
+        approved_by: "human",
+        created_at: "2026-08-22T00:00:00.000Z"
+      }
+    ]);
+    const added = applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m9-send",
+      spec: { addJourney: { name: "绑定发送", control_id: "ctl-send" } }
+    });
+    const list = added.effects.find((item) => item.id === LIST_EFFECT_ID);
+    expect(list?.observation.observed).toBe(false);
+    expect(list?.observation.display_value).toBe(UNOBSERVED);
+    generateAll(added, dir);
+    const mapMd = readFileSync(join(dir, "generated/product-map/product-map.md"), "utf8");
+    expect(mapMd).toMatch(new RegExp(`列表：${UNOBSERVED}`));
+    expect(mapMd).not.toMatch(new RegExp(`列表：${OBSERVED}`));
+  });
+
+  it("confirmEffects 遇到未知 effect_id 或缺失 evidence_ref 硬失败", () => {
+    const dir = tmp("bm-m9-bad-");
+    writeCreateStudy(dir);
+    writeCreateProbePlan(dir, "bad");
+    writeLiveRunContext(dir, "http://127.0.0.1:4949/");
+    writeJsonl(join(dir, "runs", "run-m9-bad", "bindings.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        binding_id: "bind-create-submit",
+        control_id: "ctl-create-submit",
+        approved_locator: { type: "role", value: "button;name=提交创建" },
+        approved_by: "human",
+        created_at: "2026-08-22T00:00:00.000Z"
+      }
+    ]);
+    writeJsonl(join(dir, "runs", "run-m9-bad", "evidence", "runtime.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        id: "ev-named-item",
+        immutable: true,
+        source: "runtime",
+        kind: "runtime-other",
+        payload: { name: "bad-item" }
+      }
+    ]);
+    applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m9-bad",
+      spec: {
+        addJourney: [{ journey_id: CREATE_JOURNEY_ID, control_id: "ctl-create-submit", name: "创建条目" }]
+      }
+    });
+
+    expect(() =>
+      applyHumanReview({
+        analysisRoot: dir,
+        runId: "run-m9-bad",
+        spec: {
+          confirmEffects: [
+            { journey_id: "jny-missing", effect_id: LIST_EFFECT_ID, evidence_ref: "ev-named-item" }
+          ]
+        }
+      })
+    ).toThrow(/确认效果失败/);
+
+    expect(() =>
+      applyHumanReview({
+        analysisRoot: dir,
+        runId: "run-m9-bad",
+        spec: {
+          confirmEffects: [
+            { journey_id: CREATE_JOURNEY_ID, effect_id: "eff-missing", evidence_ref: "ev-named-item" }
+          ]
+        }
+      })
+    ).toThrow(/确认效果失败/);
+
+    expect(() =>
+      applyHumanReview({
+        analysisRoot: dir,
+        runId: "run-m9-bad",
+        spec: {
+          confirmEffects: [
+            { journey_id: CREATE_JOURNEY_ID, effect_id: LIST_EFFECT_ID, evidence_ref: "ev-missing" }
+          ]
+        }
+      })
+    ).toThrow(/确认效果失败/);
+  });
+
+  it("只有长 payload.text 的 evidence 硬失败；补上 display_value 后写入名称且 observed", () => {
+    const dir = tmp("bm-m9-text-");
+    writeCreateStudy(dir);
+    writeCreateProbePlan(dir, "item-alpha");
+    writeLiveRunContext(dir, "http://127.0.0.1:4950/");
+    writeJsonl(join(dir, "runs", "run-m9-text", "bindings.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        binding_id: "bind-create-submit",
+        control_id: "ctl-create-submit",
+        approved_locator: { type: "role", value: "button;name=提交创建" },
+        approved_by: "human",
+        created_at: "2026-08-22T00:00:00.000Z"
+      }
+    ]);
+    writeJsonl(join(dir, "runs", "run-m9-text", "evidence", "runtime.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        id: "ev-page-dump",
+        immutable: true,
+        source: "runtime",
+        kind: "runtime-other",
+        payload: {
+          text: "列表面 打开目标面 打开创建面 名称 提交 已有条目 管理后台 话题串 swipe 一整页倾倒文本"
+        }
+      }
+    ]);
+    applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m9-text",
+      spec: {
+        addJourney: [{ journey_id: CREATE_JOURNEY_ID, control_id: "ctl-create-submit", name: "创建条目" }]
+      }
+    });
+
+    expect(() =>
+      applyHumanReview({
+        analysisRoot: dir,
+        runId: "run-m9-text",
+        spec: {
+          confirmEffects: [
+            { journey_id: CREATE_JOURNEY_ID, effect_id: LIST_EFFECT_ID, evidence_ref: "ev-page-dump" }
+          ]
+        }
+      })
+    ).toThrow(/确认效果失败/);
+
+    const confirmed = applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m9-text",
+      spec: {
+        confirmEffects: [
+          {
+            journey_id: CREATE_JOURNEY_ID,
+            effect_id: LIST_EFFECT_ID,
+            evidence_ref: "ev-page-dump",
+            display_value: "item-alpha"
+          }
+        ]
+      }
+    });
+    const list = confirmed.effects.find((item) => item.id === LIST_EFFECT_ID);
+    expect(list?.observation.observed).toBe(true);
+    expect(list?.observation.display_value).toBe("item-alpha");
+    expect(list?.observation.evidence_refs).toContain("ev-page-dump");
   });
 });
