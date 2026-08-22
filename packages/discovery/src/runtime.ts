@@ -12,6 +12,7 @@ import {
   type Candidate,
   type Control,
   type EvidenceRecord,
+  type Gap,
   type Observation,
   type ProbePlan,
   type RunContext,
@@ -155,6 +156,12 @@ export async function exploreRuntime(
 /** click | type | submit 的有限超时；超时记 execute_failed，不改搜。 */
 export const DECLARED_ACTION_TIMEOUT_MS = 10_000;
 
+/** 单条 listitem/link 读取的短超时；脱离节点直接跳过，避免 30s 挂起。 */
+export const COLLECTION_ITEM_TIMEOUT_MS = 150;
+
+/** 大页链接上限，避免管理信息页把 play 拖死。 */
+export const COLLECTION_NODE_CAP = 24;
+
 export function pageHasNavigated(session: DriverSession): boolean {
   const url = session.page.url();
   return url.startsWith("http://") || url.startsWith("https://");
@@ -201,12 +208,16 @@ export async function executeAction(
   const session = shared ?? (await openSession(context, options));
   const evidence: EvidenceRecord[] = [];
   const observations: Observation[] = [];
+  const collectionGaps: Gap[] = [];
+  let actionCompleted = false;
   try {
     const entryUrl = context.entry_url || project.base_url;
     if (!pageHasNavigated(session)) {
       await session.page.goto(entryUrl, { waitUntil: "domcontentloaded" });
     }
-    const listBefore = await readCollection(session);
+    const listBeforeRead = await readCollection(session);
+    noteCollectionGap(collectionGaps, listBeforeRead);
+    const listBefore = listBeforeRead.names;
     const locator = await waitForApprovedVisible(session.page, binding.approved_locator);
     if (!locator) {
       const miss = evidenceRecord("runtime-execute", {
@@ -220,6 +231,7 @@ export async function executeAction(
 
     const beforeRequests = session.requests.length;
     await performDeclared(action.action, locator.first(), action.value);
+    actionCompleted = true;
     await new Promise((resolve) => setTimeout(resolve, 400));
 
     const currentText = ((await session.page.locator("main, body").first().textContent()) ?? "").trim();
@@ -253,12 +265,16 @@ export async function executeAction(
 
     const pushed = session.websockets.length > 0;
     let otherText = "";
-    let listAfter = await readCollection(session);
+    let listAfterRead = await readCollection(session);
+    noteCollectionGap(collectionGaps, listAfterRead);
+    let listAfter = listAfterRead.names;
     if (!pushed && listAfter.length === 0) {
       const refreshUrl = project.base_url || entryUrl;
       if (!sameUrl(refreshUrl, session.page.url())) {
         await session.page.goto(refreshUrl, { waitUntil: "domcontentloaded" });
-        listAfter = await readCollection(session);
+        listAfterRead = await readCollection(session);
+        noteCollectionGap(collectionGaps, listAfterRead);
+        listAfter = listAfterRead.names;
       }
     }
     if (pushed) {
@@ -335,10 +351,27 @@ export async function executeAction(
       observations,
       evidence,
       candidates: persisted.candidates,
-      gaps: [],
+      gaps: collectionGaps,
       cross_actor: CROSS_ACTOR
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (actionCompleted && isCollectionScrapeError(message)) {
+      return {
+        status: "success",
+        observations,
+        evidence,
+        candidates: persistMerged(runRoot, [], [], evidence).candidates,
+        gaps: [
+          ...collectionGaps,
+          {
+            reason: "collection_scrape",
+            message
+          }
+        ],
+        cross_actor: CROSS_ACTOR
+      };
+    }
     return {
       status: "failed",
       observations,
@@ -347,7 +380,7 @@ export async function executeAction(
       gaps: [
         {
           reason: "execute_failed",
-          message: error instanceof Error ? error.message : String(error)
+          message
         }
       ],
       cross_actor: CROSS_ACTOR
@@ -515,9 +548,15 @@ async function discoverVisible(
   return { candidates, evidence };
 }
 
-async function readCollection(session: DriverSession): Promise<string[]> {
+interface CollectionRead {
+  names: string[];
+  scrapeError?: string;
+}
+
+async function readCollection(session: DriverSession): Promise<CollectionRead> {
   const names: string[] = [];
   const seen = new Set<string>();
+  let scrapeError: string | undefined;
   const add = (value: string): void => {
     const name = value.trim();
     if (!name || seen.has(name)) {
@@ -527,16 +566,43 @@ async function readCollection(session: DriverSession): Promise<string[]> {
     names.push(name);
   };
   for (const role of ["listitem", "link"] as const) {
-    const locators = session.page.getByRole(role);
-    const count = await locators.count();
-    for (let index = 0; index < count; index += 1) {
-      const node = locators.nth(index);
-      const labeled = ((await node.getAttribute("aria-label")) ?? "").trim();
-      const text = ((await node.innerText()) ?? "").trim();
-      add(labeled || text);
+    try {
+      const locators = session.page.getByRole(role);
+      const rawCount = await locators.count();
+      const count = Math.min(rawCount, COLLECTION_NODE_CAP);
+      for (let index = 0; index < count; index += 1) {
+        const node = locators.nth(index);
+        try {
+          const labeled = ((await node.getAttribute("aria-label", { timeout: COLLECTION_ITEM_TIMEOUT_MS })) ?? "").trim();
+          const text = labeled
+            ? ""
+            : ((await node.innerText({ timeout: COLLECTION_ITEM_TIMEOUT_MS })) ?? "").trim();
+          add(labeled || text);
+        } catch (error) {
+          scrapeError ??= error instanceof Error ? error.message : String(error);
+        }
+      }
+    } catch (error) {
+      scrapeError = error instanceof Error ? error.message : String(error);
     }
   }
-  return names;
+  return { names, scrapeError };
+}
+
+function noteCollectionGap(gaps: Gap[], read: CollectionRead): void {
+  if (!read.scrapeError || gaps.some((item) => item.reason === "collection_scrape")) {
+    return;
+  }
+  gaps.push({
+    reason: "collection_scrape",
+    message: read.scrapeError
+  });
+}
+
+function isCollectionScrapeError(message: string): boolean {
+  return /getAttribute|innerText|getByRole\('(?:link|listitem)'\)|getByRole\("(?:link|listitem)"\)/.test(
+    message
+  );
 }
 
 function evidenceRecord(kind: string, payload: Record<string, unknown>): EvidenceRecord {

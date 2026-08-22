@@ -130,7 +130,41 @@ function lateComposePage() {
 `;
 }
 
-// 现场 SPA：Send 在撰写框为空时禁用。两次独立浏览器会丢掉已输入文本。
+// 大量轮换链接页：模拟 SPA 导航后节点脱离，用来证明 collection 刮取不得拖死已成功的点击。
+function manyLinksPage() {
+  return `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>信息面</title>
+  </head>
+  <body>
+    <main id="surface-info" data-surface="surface-info" data-role="current" aria-label="信息面">
+      <h1>信息面</h1>
+      <p>本页有大量会轮换的链接，用来证明 collection 刮取不得拖死已成功的点击。</p>
+      <nav id="link-cloud" aria-label="信息链接"></nav>
+    </main>
+    <script>
+      const cloud = document.getElementById("link-cloud");
+      let tick = 0;
+      function paint() {
+        tick += 1;
+        const links = [];
+        for (let i = 0; i < 40; i += 1) {
+          links.push(
+            '<a href="#n' + i + "-" + tick + '" aria-label="信息链接 ' + i + "-" + tick + '">信息链接 ' + i + "</a>"
+          );
+        }
+        cloud.innerHTML = links.join("");
+      }
+      paint();
+      setInterval(paint, 80);
+    </script>
+  </body>
+</html>
+`;
+}
+
 function liveComposePage() {
   return `<!doctype html>
 <html lang="zh-CN">
@@ -293,6 +327,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/compose-live" || url.pathname === "/compose-live.html") {
     sendHtml(res, liveComposePage());
+    return;
+  }
+  if (url.pathname === "/info" || url.pathname === "/info.html") {
+    sendHtml(res, manyLinksPage());
     return;
   }
   res.writeHead(404);
