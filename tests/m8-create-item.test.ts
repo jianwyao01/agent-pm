@@ -16,7 +16,7 @@ import {
   type Study
 } from "@behavior-map/contracts";
 import { DefaultDiscoveryAdapter, loadControls } from "@behavior-map/discovery";
-import { generateTests } from "@behavior-map/export";
+import { generateAll, generateTests, renderProductMapProse } from "@behavior-map/export";
 import { DefaultProjectAdapter } from "@behavior-map/project";
 import { applyHumanReview, hydrateModel, runClosedLoop, writeReviewedModel } from "@behavior-map/review";
 import { writePlanFile, writeTrusted, reservePort } from "./helpers/tiny-processes.js";
@@ -211,6 +211,7 @@ describe("M8 创建面深化域", () => {
     const after = retargeted.journeys.find((item) => item.id === journey!.id);
     expect(after?.control_id).toBe("ctl-create-submit");
     expect(after?.entry_url).toBe("http://127.0.0.1:4343/");
+    expect(after?.status).toBe("accepted");
 
     const stripped = {
       ...after!,
@@ -476,7 +477,180 @@ describe("M8 创建面深化域", () => {
     expect(spec).toMatch(/\.fill\(/);
     expect(spec).not.toContain("#control-send");
     expect(spec).not.toContain("about:blank");
+
+    const mapMd = readFileSync(join(dir, "generated/product-map/product-map.md"), "utf8");
+    expect(mapMd).toContain("## 创建条目控件");
+    expect(mapMd).toContain("## 已接受的创建条目旅程");
+    expect(mapMd).not.toMatch(/## 发送控件/);
+    expect(mapMd).not.toMatch(/已接受的发送旅程/);
   }, 80_000);
+
+  it("retarget 重写挂在该 control_id 上的 leftover cap-send；能力名不是 发送；旅程 accepted；地图标题跟随能力名", () => {
+    const dir = tmp("bm-m8c-leftover-");
+    writeCreateStudy(dir);
+    writeCreateProbePlan(dir, "leftover-name");
+    writeLiveRunContext(dir, "http://127.0.0.1:4545/");
+    writeJsonl(join(dir, "runs", "run-m8c", "bindings.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        binding_id: "bind-create-submit",
+        control_id: "ctl-create-submit",
+        approved_locator: { type: "role", value: "button;name=提交创建" },
+        approved_by: "human",
+        created_at: "2026-08-22T00:00:00.000Z"
+      }
+    ]);
+    writeReviewedModel(dir, {
+      schema_version: SCHEMA_VERSION,
+      capabilities: [
+        { id: "cap-send", name: "发送", control_ids: ["ctl-create-submit"] },
+        { id: "cap-other", name: "其它能力", control_ids: ["ctl-unrelated"] }
+      ],
+      journeys: [
+        {
+          id: CREATE_JOURNEY_ID,
+          name: "创建条目",
+          status: "accepted",
+          effect_ids: [],
+          control_id: "ctl-create-submit"
+        }
+      ],
+      effects: [],
+      decisions: [
+        {
+          candidate_id: `human-added:${CREATE_JOURNEY_ID}`,
+          review_status: "kept",
+          journey_id: CREATE_JOURNEY_ID
+        }
+      ],
+      surfaces: [],
+      controls: []
+    });
+
+    const retargeted = applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m8c",
+      spec: { retarget: [{ journey_id: CREATE_JOURNEY_ID, control_id: "ctl-create-submit" }] }
+    });
+    const journey = retargeted.journeys.find((item) => item.id === CREATE_JOURNEY_ID);
+    expect(journey?.status).toBe("accepted");
+    const attached = retargeted.capabilities.filter((item) => item.control_ids.includes("ctl-create-submit"));
+    expect(attached.length).toBeGreaterThan(0);
+    expect(attached.every((item) => item.name !== "发送")).toBe(true);
+    expect(retargeted.capabilities.some((item) => item.name === "创建条目")).toBe(true);
+    expect(
+      retargeted.capabilities.some((item) => item.id === "cap-other" && item.name === "其它能力")
+    ).toBe(true);
+    expect(
+      retargeted.capabilities.some(
+        (item) => item.id === "cap-send" && item.control_ids.includes("ctl-create-submit")
+      )
+    ).toBe(false);
+
+    generateAll(retargeted, dir);
+    const mapMd = readFileSync(join(dir, "generated/product-map/product-map.md"), "utf8");
+    expect(mapMd).toContain("## 创建条目控件");
+    expect(mapMd).toContain("## 已接受的创建条目旅程");
+    expect(mapMd).not.toMatch(/## 发送控件/);
+    expect(mapMd).not.toMatch(/已接受的发送旅程/);
+  });
+
+  it("发送旅程 retarget 后仍可 cap-send / 发送；地图标题仍写 发送", () => {
+    const dir = tmp("bm-m8c-send-");
+    writeCreateStudy(dir);
+    writeCreateProbePlan(dir, "send-keep");
+    writeLiveRunContext(dir, "http://127.0.0.1:4646/");
+    writeJsonl(join(dir, "runs", "run-m8c-send", "bindings.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        binding_id: "bind-send",
+        control_id: "ctl-send",
+        approved_locator: { type: "role", value: "button;name=发送一条消息" },
+        approved_by: "human",
+        created_at: "2026-08-22T00:00:00.000Z"
+      }
+    ]);
+    writeReviewedModel(dir, {
+      schema_version: SCHEMA_VERSION,
+      capabilities: [{ id: "cap-send", name: "发送", control_ids: ["ctl-send"] }],
+      journeys: [
+        {
+          id: "jny-send",
+          name: "发送",
+          status: "accepted",
+          effect_ids: [],
+          control_id: "ctl-send"
+        }
+      ],
+      effects: [],
+      decisions: [
+        {
+          candidate_id: "human-added:jny-send",
+          review_status: "kept",
+          journey_id: "jny-send"
+        }
+      ],
+      surfaces: [],
+      controls: []
+    });
+
+    const retargeted = applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m8c-send",
+      spec: { retarget: [{ journey_id: "jny-send", control_id: "ctl-send" }] }
+    });
+    expect(retargeted.journeys.find((item) => item.id === "jny-send")?.status).toBe("accepted");
+    expect(retargeted.capabilities.some((item) => item.id === "cap-send" && item.name === "发送")).toBe(true);
+
+    generateAll(retargeted, dir);
+    const mapMd = readFileSync(join(dir, "generated/product-map/product-map.md"), "utf8");
+    expect(mapMd).toContain("## 发送控件");
+    expect(mapMd).toContain("## 已接受的发送旅程");
+  });
+
+  it("地图 markdown 标题跟随旅程或能力名；创建条目不得焊死 发送", () => {
+    const createMap = renderProductMapProse({
+      schema_version: SCHEMA_VERSION,
+      capabilities: [{ id: "cap-new-item", name: "创建条目", control_ids: ["ctl-create-submit"] }],
+      journeys: [
+        {
+          id: CREATE_JOURNEY_ID,
+          name: "创建条目",
+          status: "accepted",
+          effect_ids: [],
+          control_id: "ctl-create-submit"
+        }
+      ],
+      effects: [],
+      decisions: [],
+      surfaces: [],
+      controls: []
+    });
+    expect(createMap).toContain("## 创建条目控件");
+    expect(createMap).toContain("## 已接受的创建条目旅程");
+    expect(createMap).not.toMatch(/## 发送控件/);
+    expect(createMap).not.toMatch(/已接受的发送旅程/);
+
+    const sendMap = renderProductMapProse({
+      schema_version: SCHEMA_VERSION,
+      capabilities: [{ id: "cap-send", name: "发送", control_ids: ["control-send"] }],
+      journeys: [
+        {
+          id: "jny-send",
+          name: "发送一条消息（已审定）",
+          status: "accepted",
+          effect_ids: [],
+          control_id: "control-send"
+        }
+      ],
+      effects: [],
+      decisions: [],
+      surfaces: [],
+      controls: []
+    });
+    expect(sendMap).toContain("## 发送控件");
+    expect(sendMap).toContain("## 已接受的发送旅程");
+  });
 
   it("同一 applyHumanReview：addJourney/retarget 保持 accepted；候选不必等于 ctl-*-obs；无支持的旧旅程标 stale", () => {
     const dir = tmp("bm-m8b-obs-");
@@ -563,5 +737,6 @@ describe("M8 创建面深化域", () => {
     }
     expect(existsSync(join(repoRoot(), "docs/M8.md"))).toBe(true);
     expect(existsSync(join(repoRoot(), "docs/M8b.md"))).toBe(true);
+    expect(existsSync(join(repoRoot(), "docs/M8c.md"))).toBe(true);
   });
 });

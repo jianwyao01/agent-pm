@@ -160,7 +160,7 @@ export function applyHumanReview(options: ApplyHumanReviewOptions): ReviewedMode
   }
 
   for (const retarget of spec.retarget ?? []) {
-    applyRetarget(retarget, journeys, bindings, probePlan, runContext);
+    applyRetarget(retarget, journeys, bindings, probePlan, runContext, capabilities);
     justTouched.add(retarget.journey_id);
   }
 
@@ -427,7 +427,8 @@ function applyRetarget(
   journeys: Journey[],
   bindings: Binding[],
   probePlan: ProbePlan | undefined,
-  runContext: RunContext | undefined
+  runContext: RunContext | undefined,
+  capabilities: Capability[]
 ): void {
   const journey = journeys.find((item) => item.id === spec.journey_id);
   if (!journey) {
@@ -444,6 +445,8 @@ function applyRetarget(
   if (entryUrl.entry_url) {
     journey.entry_url = entryUrl.entry_url;
   }
+  rewriteLeftoverSendCapabilities(capabilities, journey);
+  ensureJourneyCapability(capabilities, journey);
 }
 
 function assertHumanBinding(bindings: Binding[], controlId: string, action: string): void {
@@ -604,8 +607,57 @@ function ensureJourneyCapability(capabilities: Capability[], journey: Journey): 
     cap = { id: identity.id, name: identity.name, control_ids: [] };
     capabilities.push(cap);
   }
+  cap.name = identity.name;
   if (journey.control_id && !cap.control_ids.includes(journey.control_id)) {
     cap.control_ids.push(journey.control_id);
+  }
+}
+
+/**
+ * 挂在本次 control_id 上的能力：name 跟随旅程；
+ * 非发送旅程上焊死的 cap-send 残留同时改 id。不删除无关能力。
+ */
+function rewriteLeftoverSendCapabilities(capabilities: Capability[], journey: Journey): void {
+  const controlId = journey.control_id;
+  if (!controlId) {
+    return;
+  }
+  const identity = capabilityFromJourney(journey);
+  const attached = capabilities.filter((item) => item.control_ids.includes(controlId));
+  for (const cap of attached) {
+    if (cap.id === "cap-send" && identity.id !== "cap-send") {
+      remapLeftoverSendCapability(capabilities, cap, controlId, identity);
+      continue;
+    }
+    cap.name = identity.name;
+  }
+}
+
+function remapLeftoverSendCapability(
+  capabilities: Capability[],
+  leftover: Capability,
+  controlId: string,
+  identity: { id: string; name: string }
+): void {
+  const onlyThisControl = leftover.control_ids.length === 1 && leftover.control_ids[0] === controlId;
+  const collision = capabilities.find((item) => item.id === identity.id && item !== leftover);
+  if (onlyThisControl && !collision) {
+    leftover.id = identity.id;
+    leftover.name = identity.name;
+    return;
+  }
+  leftover.control_ids = leftover.control_ids.filter((id) => id !== controlId);
+  if (leftover.control_ids.length === 0) {
+    const index = capabilities.indexOf(leftover);
+    if (index >= 0) {
+      capabilities.splice(index, 1);
+    }
+  }
+  if (collision) {
+    collision.name = identity.name;
+    if (!collision.control_ids.includes(controlId)) {
+      collision.control_ids.push(controlId);
+    }
   }
 }
 
