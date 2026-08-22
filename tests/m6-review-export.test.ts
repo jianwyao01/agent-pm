@@ -6,6 +6,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import {
   UNOBSERVED,
+  loadReviewedModel,
   projectDisplay,
   readJson,
   snapshotModelFiles,
@@ -20,6 +21,7 @@ import {
   applyHumanReview,
   parseReviewCliArgs,
   runReviewCli,
+  writeReviewedModel,
   writeRunDiff
 } from "@behavior-map/review";
 import { applyFirstDeliveryReview, prepareM5Run } from "./helpers/m6-review.js";
@@ -53,7 +55,10 @@ describe("M6 人工审定与四份导出", () => {
     expect(send).toBeDefined();
     expect(send?.name).toBe("发送一条消息（已审定）");
     expect(send?.status).toBe("accepted");
-    expect(model.journeys.some((item) => item.name === "人工补录的同步确认")).toBe(true);
+    const added = model.journeys.find((item) => item.name === "人工补录的同步确认");
+    expect(added).toBeDefined();
+    expect(added?.status).toBe("accepted");
+    expect(model.capabilities.some((item) => item.id === "cap-send" && item.name === "发送")).toBe(true);
     expect(model.decisions.some((item) => item.review_status === "kept" && item.journey_id === "jny-send-001")).toBe(
       true
     );
@@ -151,12 +156,25 @@ describe("M6 人工审定与四份导出", () => {
     const sendName = first.journeys.find((item) => item.id === "jny-send-001")?.name;
     const addedId = first.journeys.find((item) => item.name === "人工补录的同步确认")?.id;
     expect(addedId).toBeDefined();
+    expect(first.journeys.find((item) => item.id === addedId)?.status).toBe("accepted");
     const modelFiles = snapshotModelFiles(root);
 
     const secondSnap = await prepareM5Run(root, "run-002");
     expect(secondSnap.snapshot).toBe(firstSnap.snapshot);
     expect(readdirSync(join(root, "runs")).sort()).toEqual(["run-001", "run-002"]);
     expect(snapshotModelFiles(root)["review-decisions.yaml"]).toBe(modelFiles["review-decisions.yaml"]);
+
+    const seeded = loadReviewedModel(root);
+    writeReviewedModel(root, {
+      ...seeded,
+      journeys: seeded.journeys.map((item) => {
+        if (item.id !== addedId) {
+          return item;
+        }
+        const { steps: _steps, ...rest } = item;
+        return { ...rest, control_id: "control-sync-confirm" };
+      })
+    });
 
     const second = applyHumanReview({ analysisRoot: root, runId: "run-002", spec: {} });
     const diff = writeRunDiff({ analysisRoot: root, runId: "run-002" });

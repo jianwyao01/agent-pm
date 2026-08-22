@@ -4,6 +4,7 @@ import {
   SCHEMA_VERSION,
   UNOBSERVED,
   loadReviewedModel,
+  collectObservedJourneyIds,
   markMissingSupport,
   probePlanActions,
   readJson,
@@ -26,7 +27,7 @@ import {
   type RunContext,
   type Transport
 } from "@behavior-map/contracts";
-import { effectIdFor, nextJourneyId } from "./ids.js";
+import { effectIdFor, nameToJourneySlug, nextJourneyId } from "./ids.js";
 import { controlIdFrom, hydrateModel, loadRunBindings, loadRunCandidates } from "./hydrate.js";
 
 export interface KeepJourneySpec {
@@ -115,6 +116,7 @@ export function applyHumanReview(options: ApplyHumanReviewOptions): ReviewedMode
   const journeys = [...existing.journeys];
   let effects = [...existing.effects];
   const capabilities = [...existing.capabilities];
+  const justTouched = new Set<string>();
 
   effects = mergeEffects(effects, proposedEffects, candidates);
   effects = ensureCrossSurfaceEffects(effects);
@@ -142,14 +144,32 @@ export function applyHumanReview(options: ApplyHumanReviewOptions): ReviewedMode
   }
 
   for (const added of normalizeAddJourney(spec.addJourney)) {
-    applyAddJourney(added, journeys, decisions, capabilities, effects, probePlan, bindings, runContext);
+    const addedId = applyAddJourney(
+      added,
+      journeys,
+      decisions,
+      capabilities,
+      effects,
+      probePlan,
+      bindings,
+      runContext
+    );
+    if (addedId) {
+      justTouched.add(addedId);
+    }
   }
 
   for (const retarget of spec.retarget ?? []) {
     applyRetarget(retarget, journeys, bindings, probePlan, runContext);
+    justTouched.add(retarget.journey_id);
   }
 
-  const observedIds = observedJourneyIds(journeys, candidates, proposedJourneys);
+  const observedIds = collectObservedJourneyIds(journeys, {
+    candidates,
+    bindings,
+    proposedNames: proposedJourneys.map((item) => item.name),
+    alwaysObservedIds: justTouched
+  });
   const reconciled = markMissingSupport(journeys, observedIds);
   for (const [index, journey] of journeys.entries()) {
     journeys[index] = { ...journey, status: reconciled[index]?.status ?? journey.status };
@@ -256,14 +276,15 @@ function applyKeep(input: {
   const control = inferControlId(proposed, input.candidates);
   const effectIds = effectIdsForProposed(proposed, input.effects);
   const name = input.keep.rename ?? proposed.name;
-  input.journeys.push({
+  const kept: Journey = {
     id: journeyId,
     name,
     status: "accepted",
     effect_ids: effectIds,
     control_id: control,
     ...stepsField(input.probePlan)
-  });
+  };
+  input.journeys.push(kept);
   if (primaryCandidate) {
     input.decisions.push({
       candidate_id: primaryCandidate,
@@ -272,7 +293,7 @@ function applyKeep(input: {
       rename: input.keep.rename
     });
   }
-  ensureSendCapability(input.capabilities, control);
+  ensureJourneyCapability(input.capabilities, kept);
 }
 
 function applyReject(input: {
@@ -339,7 +360,7 @@ function applyAddJourney(
   probePlan: ProbePlan | undefined,
   bindings: Binding[],
   runContext: RunContext | undefined
-): void {
+): string | undefined {
   if (added.journey_id) {
     if (journeys.some((item) => item.id === added.journey_id)) {
       throw new Error(`旅程 ${added.journey_id} 已存在，请使用 retarget，不要再创建一条`);
@@ -350,7 +371,7 @@ function applyAddJourney(
     assertHumanBinding(bindings, added.control_id, "补录");
     const name = added.name?.trim() || added.journey_id;
     const effectIds = added.effect_ids?.length ? added.effect_ids : effects.map((item) => item.id);
-    journeys.push({
+    const created: Journey = {
       id: added.journey_id,
       name,
       status: "accepted",
@@ -358,30 +379,31 @@ function applyAddJourney(
       control_id: added.control_id,
       ...stepsField(probePlan),
       ...entryUrlField(runContext)
-    });
+    };
+    journeys.push(created);
     decisions.push({
       candidate_id: `human-added:${added.journey_id}`,
       review_status: "kept",
       journey_id: added.journey_id
     });
-    ensureSendCapability(capabilities, added.control_id);
-    return;
+    ensureJourneyCapability(capabilities, created);
+    return added.journey_id;
   }
 
   const existingAdded = decisions.find((item) => item.candidate_id.startsWith("human-added:"));
   if (existingAdded?.journey_id) {
-    return;
+    return existingAdded.journey_id;
   }
   const name = added.name?.trim();
   if (!name) {
     throw new Error("补录旅程需要 name 或 journey_id");
   }
   if (journeys.some((item) => item.name === name)) {
-    return;
+    return journeys.find((item) => item.name === name)?.id;
   }
   const journeyId = nextJourneyId(name, journeys.map((item) => item.id));
   const effectIds = added.effect_ids?.length ? added.effect_ids : effects.map((item) => item.id);
-  journeys.push({
+  const created: Journey = {
     id: journeyId,
     name,
     status: "accepted",
@@ -389,13 +411,15 @@ function applyAddJourney(
     control_id: added.control_id,
     ...stepsField(probePlan),
     ...entryUrlField(runContext)
-  });
+  };
+  journeys.push(created);
   decisions.push({
     candidate_id: `human-added:${journeyId}`,
     review_status: "kept",
     journey_id: journeyId
   });
-  ensureSendCapability(capabilities, added.control_id);
+  ensureJourneyCapability(capabilities, created);
+  return journeyId;
 }
 
 function applyRetarget(
@@ -411,6 +435,7 @@ function applyRetarget(
   }
   assertHumanBinding(bindings, spec.control_id, "重定位");
   journey.control_id = spec.control_id;
+  journey.status = "accepted";
   const steps = stepsFromProbePlan(probePlan);
   if (steps) {
     journey.steps = steps;
@@ -572,52 +597,26 @@ function inferControlId(proposed: ProposedJourney, candidates: Candidate[]): str
   return send ? controlIdFrom(send) : undefined;
 }
 
-function ensureSendCapability(capabilities: Capability[], controlId?: string): void {
-  if (capabilities.some((item) => item.id === "cap-send")) {
-    if (controlId && !capabilities[0]?.control_ids.includes(controlId)) {
-      const cap = capabilities.find((item) => item.id === "cap-send");
-      if (cap && !cap.control_ids.includes(controlId)) {
-        cap.control_ids.push(controlId);
-      }
-    }
-    return;
+function ensureJourneyCapability(capabilities: Capability[], journey: Journey): void {
+  const identity = capabilityFromJourney(journey);
+  let cap = capabilities.find((item) => item.id === identity.id);
+  if (!cap) {
+    cap = { id: identity.id, name: identity.name, control_ids: [] };
+    capabilities.push(cap);
   }
-  capabilities.push({
-    id: "cap-send",
-    name: "发送",
-    control_ids: controlId ? [controlId] : []
-  });
+  if (journey.control_id && !cap.control_ids.includes(journey.control_id)) {
+    cap.control_ids.push(journey.control_id);
+  }
 }
 
-function observedJourneyIds(
-  journeys: Journey[],
-  candidates: Candidate[],
-  proposed: ProposedJourney[]
-): string[] {
-  const candidateIds = new Set(candidates.map((item) => item.id));
-  const proposedNames = new Set(proposed.map((item) => item.name));
-  const observed: string[] = [];
-  for (const journey of journeys) {
-    if (journey.id.startsWith("jny-") && proposedNames.has(journey.name.replace(/（已审定）$/, ""))) {
-      observed.push(journey.id);
-      continue;
-    }
-    if (proposed.some((item) => item.name === journey.name || journey.name.startsWith(item.name))) {
-      observed.push(journey.id);
-      continue;
-    }
-    if (journey.control_id) {
-      const controlSeen = candidates.some(
-        (item) =>
-          item.kind === "control" &&
-          (controlIdFrom(item) === journey.control_id || item.discovery_key.includes(journey.control_id!))
-      );
-      if (controlSeen && candidateIds.size > 0 && !journey.id.includes("human") && !/人工|补录/.test(journey.name)) {
-        observed.push(journey.id);
-      }
-    }
+function capabilityFromJourney(journey: Pick<Journey, "id" | "name">): { id: string; name: string } {
+  const text = `${journey.id} ${journey.name}`;
+  if (/发送/.test(text) || /(?:^|-)send(?:-|$)/i.test(journey.id.replace(/^jny-/, ""))) {
+    return { id: "cap-send", name: "发送" };
   }
-  return observed;
+  const fromId = journey.id.replace(/^jny-/, "");
+  const slug = fromId && fromId !== "journey" ? fromId : nameToJourneySlug(journey.name);
+  return { id: `cap-${slug}`, name: journey.name };
 }
 
 function assertDecisionsPreserved(before: ReviewedModel, after: ReviewedModel): void {
