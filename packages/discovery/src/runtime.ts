@@ -241,7 +241,8 @@ export async function executeAction(
     const currentEv = evidenceRecord("runtime-current", {
       binding_id: binding.binding_id,
       surface: action.surface_id || probe?.target_surface,
-      text: currentText.slice(0, 400)
+      text: currentText.slice(0, 400),
+      url: session.page.url()
     });
     evidence.push(currentEv);
     observations.push({
@@ -292,7 +293,8 @@ export async function executeAction(
       list_before: listBefore,
       list_after: listAfter,
       delta,
-      text: otherText.slice(0, 400)
+      text: otherText.slice(0, 400),
+      url: session.page.url()
     });
     evidence.push(otherEv);
     const otherObserved = pushed || delta.length > 0 || listAfter.length > listBefore.length;

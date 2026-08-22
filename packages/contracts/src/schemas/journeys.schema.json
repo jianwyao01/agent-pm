@@ -20,6 +20,9 @@
           "effect_ids": { "type": "array", "items": { "type": "string" } },
           "control_id": { "type": "string" },
           "entry_url": { "type": "string", "minLength": 1 },
+          "affected_parties": { "type": "string" },
+          "combinations": { "type": "string" },
+          "keep_reason": { "type": "string" },
           "steps": {
             "type": "array",
             "items": {

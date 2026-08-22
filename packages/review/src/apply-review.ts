@@ -27,7 +27,9 @@ import {
   type ReviewDecision,
   type ReviewedModel,
   type RunContext,
-  type Transport
+  type Transport,
+  isLoneUserParty,
+  promoteMissingControlCandidates
 } from "@behavior-map/contracts";
 import { effectIdFor, nameToJourneySlug, nextJourneyId } from "./ids.js";
 import { controlIdFrom, hydrateModel, loadRunBindings, loadRunCandidates } from "./hydrate.js";
@@ -73,10 +75,19 @@ export interface ConfirmEffectSpec {
   display_value?: string;
 }
 
+export interface AnnotateJourneySpec {
+  journey_id: string;
+  affected_parties?: string;
+  combinations?: string;
+  keep_reason?: string;
+}
+
 /**
  * 人类审定输入。可 keep / reject / rename，并可补录一条其认为有效的旅程。
  * retarget 必须显式给出；hydrateModel 不得发明重定位。
  * confirmEffects 只确认已有六列槽位与本 run 已有 evidence，不得猜测。
+ * annotate 只写 MAP-2/7/8 字段，不改 status / steps / entry_url / 六列 observed。
+ * keep_reason 在 annotate 上，不在 KeepJourneySpec。
  */
 export interface HumanReviewSpec {
   keep?: KeepJourneySpec[];
@@ -86,6 +97,7 @@ export interface HumanReviewSpec {
   addJourney?: AddedJourneySpec | AddedJourneySpec[];
   retarget?: RetargetSpec[];
   confirmEffects?: ConfirmEffectSpec[];
+  annotate?: AnnotateJourneySpec[];
 }
 
 export interface ApplyHumanReviewOptions {
@@ -116,6 +128,7 @@ export function applyHumanReview(options: ApplyHumanReviewOptions): ReviewedMode
   const spec = options.spec ?? {};
   const existing = loadReviewedModel(analysisRoot);
   const modelExisted = existsSync(join(analysisRoot, "model", "journeys.yaml"));
+  promoteMissingControlCandidates(join(analysisRoot, "runs", runId));
   const candidates = loadRunCandidates(analysisRoot, runId);
   const bindings = loadRunBindings(analysisRoot, runId);
   const probePlan = loadStudyProbePlan(analysisRoot);
@@ -190,6 +203,10 @@ export function applyHumanReview(options: ApplyHumanReviewOptions): ReviewedMode
   const reconciled = markMissingSupport(journeys, observedIds);
   for (const [index, journey] of journeys.entries()) {
     journeys[index] = { ...journey, status: reconciled[index]?.status ?? journey.status };
+  }
+
+  for (const note of spec.annotate ?? []) {
+    applyAnnotate(note, journeys);
   }
 
   const model: ReviewedModel = {
@@ -464,6 +481,25 @@ function applyRetarget(
   }
   rewriteLeftoverSendCapabilities(capabilities, journey);
   ensureJourneyCapability(capabilities, journey);
+}
+
+function applyAnnotate(spec: AnnotateJourneySpec, journeys: Journey[]): void {
+  const journey = journeys.find((item) => item.id === spec.journey_id);
+  if (!journey) {
+    throw new Error(`标注失败：不存在旅程 ${spec.journey_id}`);
+  }
+  if (spec.affected_parties !== undefined) {
+    if (isLoneUserParty(spec.affected_parties)) {
+      throw new Error("标注失败：affected_parties 不得为单独的「用户」");
+    }
+    journey.affected_parties = spec.affected_parties;
+  }
+  if (spec.combinations !== undefined) {
+    journey.combinations = spec.combinations;
+  }
+  if (spec.keep_reason !== undefined) {
+    journey.keep_reason = spec.keep_reason;
+  }
 }
 
 function applyConfirmEffect(

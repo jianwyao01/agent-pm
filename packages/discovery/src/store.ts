@@ -2,6 +2,7 @@ import { join } from "node:path";
 import {
   ensureDir,
   listRunIds,
+  promoteMissingControlCandidates,
   readJsonl,
   writeJsonl,
   type Binding,
@@ -148,7 +149,8 @@ export function persistMerged(
   const runtimeEvidence = uniqueEvidence([...loadEvidence(runRoot, "runtime"), ...incomingRuntime]);
   const controls = mergeControls(loadControls(runRoot), incomingControls);
   writeDiscoveryArtifacts(runRoot, candidates, staticEvidence, runtimeEvidence, controls);
-  return { candidates, staticEvidence, runtimeEvidence, controls };
+  const promoted = promoteMissingControlCandidates(runRoot);
+  return { candidates: promoted, staticEvidence, runtimeEvidence, controls };
 }
 
 function uniqueEvidence(rows: EvidenceRecord[]): EvidenceRecord[] {

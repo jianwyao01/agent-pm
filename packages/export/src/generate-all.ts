@@ -4,12 +4,14 @@ import { generateDiagrams } from "./diagrams.js";
 import { generateProductMap } from "./product-map.js";
 import { generateTests } from "./tests.js";
 import { generateWeb } from "./web.js";
+import { loadProductMapContext } from "./map-context.js";
 
-export function generateAll(model: ReviewedModel, analysisRoot: string): string[] {
+export function generateAll(model: ReviewedModel, analysisRoot: string, runId?: string): string[] {
+  const extras = loadProductMapContext(analysisRoot, model, runId);
   const generatedRoot = join(analysisRoot, "generated");
-  generateProductMap(model, generatedRoot);
+  generateProductMap(model, generatedRoot, extras);
   generateDiagrams(model, generatedRoot);
-  generateWeb(model, generatedRoot);
+  generateWeb(model, generatedRoot, extras);
   generateTests(model, generatedRoot);
   return [
     join(generatedRoot, "product-map", "product-map.json"),
