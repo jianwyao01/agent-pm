@@ -509,7 +509,12 @@ describe("M8 创建面深化域", () => {
       runId: "run-m8",
       spec: {
         confirmEffects: [
-          { journey_id: CREATE_JOURNEY_ID, effect_id: LIST_EFFECT_ID, evidence_ref: named!.id }
+          {
+            journey_id: CREATE_JOURNEY_ID,
+            effect_id: LIST_EFFECT_ID,
+            evidence_ref: named!.id,
+            display_value: unique
+          }
         ]
       }
     });
