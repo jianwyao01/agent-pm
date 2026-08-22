@@ -18,7 +18,20 @@
           "name": { "type": "string" },
           "status": { "enum": ["accepted", "stale", "not_observed"] },
           "effect_ids": { "type": "array", "items": { "type": "string" } },
-          "control_id": { "type": "string" }
+          "control_id": { "type": "string" },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["binding_id", "action"],
+              "properties": {
+                "binding_id": { "type": "string", "minLength": 1 },
+                "action": { "enum": ["click", "type", "submit"] },
+                "value": { "type": "string" }
+              }
+            }
+          }
         }
       }
     }

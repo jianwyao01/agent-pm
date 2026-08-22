@@ -20,6 +20,19 @@
     "session_slot": { "type": "string", "minLength": 1 },
     "target_surface": { "type": "string", "minLength": 1 },
     "send_action": { "type": "string", "minLength": 1 },
-    "other_surfaces_to_refresh": { "type": "array", "items": { "type": "string" } }
+    "other_surfaces_to_refresh": { "type": "array", "items": { "type": "string" } },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["binding_id", "action"],
+        "properties": {
+          "binding_id": { "type": "string", "minLength": 1 },
+          "action": { "enum": ["click", "type", "submit"] },
+          "value": { "type": "string" }
+        }
+      }
+    }
   }
 }

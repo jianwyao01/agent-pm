@@ -7,7 +7,8 @@ export {
   type HumanReviewSpec,
   type KeepJourneySpec,
   type RejectSpec,
-  type RenameSpec
+  type RenameSpec,
+  type RetargetSpec
 } from "./apply-review.js";
 export { writeRunDiff, resolveBaselineRunId, type WriteRunDiffOptions } from "./write-diff.js";
 export { parseReviewCliArgs, runReviewCli, type ReviewCliArgs } from "./cli.js";

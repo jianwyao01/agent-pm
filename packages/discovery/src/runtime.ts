@@ -7,6 +7,7 @@ import {
   newEvidenceId,
   readYaml,
   stableCandidateId,
+  validateDocument,
   type ActionObservation,
   type Candidate,
   type Control,
@@ -50,7 +51,12 @@ export function loadProbePlan(workspacePath: string): ProbePlan | undefined {
   if (!existsSync(file)) {
     return undefined;
   }
-  return readYaml<ProbePlan>(file);
+  const data = readYaml<ProbePlan>(file);
+  const report = validateDocument("probe-plan", data, file);
+  if (!report.ok) {
+    throw new Error(report.issues.map((issue) => issue.message).join("; "));
+  }
+  return data;
 }
 
 export function loadStudy(workspacePath: string): Study | undefined {

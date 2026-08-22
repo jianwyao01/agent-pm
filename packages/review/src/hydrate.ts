@@ -90,6 +90,10 @@ export function controlsFromCandidates(candidates: Candidate[], bindings: Bindin
   return out;
 }
 
+/**
+ * 只把 bindings.jsonl 里的 approved_locator 挂到 control 上。
+ * 不得改写 journey.control_id，不得发明 retarget。
+ */
 export function hydrateModel(
   analysisRoot: string,
   runId: string,
@@ -100,8 +104,38 @@ export function hydrateModel(
   return {
     ...model,
     surfaces: surfacesFromCandidates(candidates),
-    controls: controlsFromCandidates(candidates, bindings)
+    controls: [
+      ...controlsFromCandidates(candidates, bindings),
+      ...controlsFromUnmatchedBindings(bindings, candidates)
+    ]
   };
+}
+
+function controlsFromUnmatchedBindings(bindings: Binding[], candidates: Candidate[]): Control[] {
+  const existingIds = new Set(
+    candidates.filter((item) => item.kind === "control").map((item) => controlIdFrom(item))
+  );
+  const out: Control[] = [];
+  const seen = new Set<string>();
+  for (const binding of bindings) {
+    if (existingIds.has(binding.control_id) || seen.has(binding.binding_id)) {
+      continue;
+    }
+    seen.add(binding.binding_id);
+    out.push({
+      id: binding.control_id,
+      surface_id: "surface-unknown",
+      name: binding.control_id,
+      action: "click",
+      binding_id: binding.binding_id,
+      locator: {
+        kind: binding.approved_locator.type,
+        value: binding.approved_locator.value,
+        reliable: true
+      }
+    });
+  }
+  return out;
 }
 
 function bindingForCandidate(candidate: Candidate, bindings: Binding[]): Binding | undefined {

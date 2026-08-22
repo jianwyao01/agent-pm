@@ -255,14 +255,18 @@ export function validateSemantics(analysisRoot: string): SemanticReport {
   const bindingsById = new Map(bindings.map((row) => [row.binding_id, row]));
 
   for (const runId of listRunIds(analysisRoot)) {
+    const runBindings = existsSync(join(analysisRoot, "runs", runId, "bindings.jsonl"))
+      ? readJsonl<Binding>(join(analysisRoot, "runs", runId, "bindings.jsonl"))
+      : [];
+    const runBindingIds = new Set(runBindings.map((row) => row.binding_id));
     const runtimeFile = join(analysisRoot, "runs", runId, "evidence", "runtime.jsonl");
     if (existsSync(runtimeFile)) {
       for (const [index, row] of readJsonl<EvidenceRecord>(runtimeFile).entries()) {
         const bindingId = row.payload?.binding_id;
-        if (typeof bindingId === "string" && bindingId.length > 0 && !bindingsById.has(bindingId)) {
+        if (typeof bindingId === "string" && bindingId.length > 0 && !runBindingIds.has(bindingId)) {
           issues.push({
             code: "missing_binding_ref",
-            message: `execute 产物引用了不存在的 binding_id ${bindingId}`,
+            message: `execute/play 产物引用了不存在的 binding_id ${bindingId}`,
             path: `${runtimeFile}:${index + 1}`
           });
         }
@@ -315,6 +319,24 @@ export function validateSemantics(analysisRoot: string): SemanticReport {
           message: "generated test locator 不得回退 #control-send",
           path: specFile
         });
+      }
+    }
+    for (const journey of model.journeys) {
+      if (!journey.steps?.length || !journeyTestEmitsLocators(spec, journey.id)) {
+        continue;
+      }
+      for (const step of journey.steps) {
+        const binding = bindingsById.get(step.binding_id);
+        if (!binding) {
+          continue;
+        }
+        if (!spec.includes(binding.approved_locator.value)) {
+          issues.push({
+            code: "generated_locator_mismatch",
+            message: `generated test 每一步 locator 必须等于 approved_locator（${step.binding_id}）`,
+            path: specFile
+          });
+        }
       }
     }
   }
@@ -426,6 +448,17 @@ export function approvedReadsForRun(runId: string): string[] {
     "model/effects.yaml",
     "model/review-decisions.yaml"
   ];
+}
+
+function journeyTestEmitsLocators(spec: string, journeyId: string): boolean {
+  const marker = `// Journey ID: ${journeyId}`;
+  const start = spec.indexOf(marker);
+  if (start < 0) {
+    return false;
+  }
+  const next = spec.indexOf("// Journey ID:", start + marker.length);
+  const block = next < 0 ? spec.slice(start) : spec.slice(start, next);
+  return /getByRole|page\.locator\(/.test(block) && !/test\.skip/.test(block);
 }
 
 function hasSemanticGuess(row: Record<string, unknown>): boolean {

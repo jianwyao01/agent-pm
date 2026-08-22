@@ -55,6 +55,18 @@ export interface Study {
   exploration_mode: "approved_probe";
 }
 
+export const PROBE_ACTION_KINDS = ["click", "type", "submit"] as const;
+export type ProbeActionKind = (typeof PROBE_ACTION_KINDS)[number];
+
+/** Probe 一步：只点名 binding_id，禁止 CSS 或语义目标。 */
+export interface ProbePlanAction {
+  binding_id: string;
+  action: ProbeActionKind;
+  value?: string;
+}
+
+export type JourneyStep = ProbePlanAction;
+
 export interface ProbePlan {
   schema_version: SchemaVersion;
   human_approved: true;
@@ -63,6 +75,8 @@ export interface ProbePlan {
   target_surface: string;
   send_action: string;
   other_surfaces_to_refresh: string[];
+  /** 有序步骤。省略时按 [{ binding_id: send_action, action: "click" }] 处理。 */
+  actions?: ProbePlanAction[];
 }
 
 /** Source 种类。GitHub/GitLab 只是 git 宿主，不是核心类型。 */
@@ -487,6 +501,8 @@ export interface Journey {
   status: JourneyLifecycle;
   effect_ids: string[];
   control_id?: string;
+  /** 接受或重定位时从人类批准的 ProbePlan.actions 拷入；model/ 是唯一语义源。 */
+  steps?: JourneyStep[];
 }
 
 export interface Capability {
