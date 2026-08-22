@@ -10,6 +10,11 @@ export {
   type RenameSpec,
   type RetargetSpec
 } from "./apply-review.js";
+export {
+  runClosedLoop,
+  type RunClosedLoopOptions,
+  type RunClosedLoopResult
+} from "./closed-loop.js";
 export { writeRunDiff, resolveBaselineRunId, type WriteRunDiffOptions } from "./write-diff.js";
 export { parseReviewCliArgs, runReviewCli, type ReviewCliArgs } from "./cli.js";
 export { hydrateModel, loadRunCandidates } from "./hydrate.js";

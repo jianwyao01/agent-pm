@@ -25,6 +25,7 @@ import type {
  * M5 实现真实 AgentRunner（DefaultAgentRunner）；Mock 仍用于合约测试。
  * M6 实现人工审定 model/ 与四份导出函数（不是第五套接口）。
  * M6b 把 play 定为官方 ProbePlan runner，并增加官方 retarget；play 仍不是第五套接口。
+ * M7 的 runClosedLoop 是 review 包里的函数，不是第五套接口。
  * boot / discovery 只消费 Workspace + SourceSnapshot，不得依赖 source.kind。
  * 替换 AgentRunner 时，Source / Project / Discovery / Export 代码无需改动。
  */

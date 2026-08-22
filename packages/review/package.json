@@ -7,6 +7,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@behavior-map/contracts": "*"
+    "@behavior-map/contracts": "*",
+    "@behavior-map/discovery": "*",
+    "@behavior-map/export": "*"
   }
 }
