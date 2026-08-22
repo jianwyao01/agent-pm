@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
+  hasValidStaticScan,
   scopeFromStudy,
   type ActionObservation,
   type DiscoveryProjectInput,
@@ -20,7 +20,7 @@ import { FIRST_DELIVERY_SCOPE_ID } from "./run-metadata.js";
 
 /**
  * 官方 study runner。是函数，不是第五套公共接口。
- * 顺序固定：scan（可跳过）→ playFromProbePlan → applyHumanReview → generateAll。
+ * 顺序固定：scan（仅当 static.jsonl 已有 ≥1 条合法记录才跳过）→ playFromProbePlan → applyHumanReview → generateAll。
  * 不得启动目标进程，不得用运行时探索去做产品动作，
  * 不得发明 bindings，不得把提案目录当 bindings，不得把 Probe 拆成 N 次孤立单步重放。
  */
@@ -52,7 +52,7 @@ export async function runClosedLoop(options: RunClosedLoopOptions): Promise<RunC
     scope
   });
 
-  if (!hasStaticScan(analysisRoot, runId)) {
+  if (!hasValidStaticScan(join(analysisRoot, "runs", runId, "evidence", "static.jsonl"))) {
     await discovery.scan(workspace, scope);
   }
 
@@ -62,15 +62,8 @@ export async function runClosedLoop(options: RunClosedLoopOptions): Promise<RunC
     runId,
     spec: options.reviewSpec
   });
-  const generatedPaths = generateAll(model, analysisRoot);
+  const generatedPaths = generateAll(model, analysisRoot, runId);
   return { played, model, generatedPaths };
-}
-
-function hasStaticScan(analysisRoot: string, runId: string): boolean {
-  const runRoot = join(analysisRoot, "runs", runId);
-  return (
-    existsSync(join(runRoot, "evidence", "static.jsonl")) && existsSync(join(runRoot, "candidates.jsonl"))
-  );
 }
 
 function scopeForStudy(analysisRoot: string): Scope {

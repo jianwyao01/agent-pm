@@ -31,6 +31,7 @@ import type {
  * M9：HumanReviewSpec.confirmEffects 确认已有六列槽位；四接口不变。
  * M14：collection 刮取失败不得把已成功的 play 点击打成 execute_failed；四接口不变。
  * M16：dump 把节点 title / aria-label 记为 locator 候选；人类可批准其中一条；四接口不变。
+ * M17：HumanReviewSpec.annotate 写入 MAP-2/7/8；generateAll 投影可观察 MAP-4/5；控件落成 control 候选。四接口不变。
  * boot / discovery 只消费 Workspace + SourceSnapshot，不得依赖 source.kind。
  * 替换 AgentRunner 时，Source / Project / Discovery / Export 代码无需改动。
  */

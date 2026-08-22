@@ -1,13 +1,15 @@
 import { join } from "node:path";
 import { DISPLAY_COLUMNS, type ReviewedModel, writeText } from "@behavior-map/contracts";
 import { journeyIdsOf, writeManifest } from "./shared.js";
+import { mapHeadingStem } from "./prose.js";
 
 export function generateDiagrams(model: ReviewedModel, generatedRoot: string): string {
   const outDir = join(generatedRoot, "diagrams");
+  const nodeLabel = mapHeadingStem(model);
   const lines = [
     "```mermaid",
     "flowchart LR",
-    "  actor[操作者] --> control[SendControl]"
+    `  actor[操作者] --> control["${escapeLabel(nodeLabel)}"]`
   ];
   for (const column of DISPLAY_COLUMNS) {
     const nodeId = safe(column.observation_kind);

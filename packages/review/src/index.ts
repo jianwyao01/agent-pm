@@ -3,6 +3,7 @@ export {
   loadRunProposals,
   writeReviewedModel,
   type AddedJourneySpec,
+  type AnnotateJourneySpec,
   type ApplyHumanReviewOptions,
   type ConfirmEffectSpec,
   type HumanReviewSpec,

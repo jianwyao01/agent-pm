@@ -8,8 +8,9 @@ import {
 } from "@behavior-map/contracts";
 import { renderProductMapProse } from "./prose.js";
 import { journeyIdsOf, writeManifest } from "./shared.js";
+import type { ProductMapContext } from "./map-context.js";
 
-export function generateWeb(model: ReviewedModel, generatedRoot: string): string {
+export function generateWeb(model: ReviewedModel, generatedRoot: string, extras?: ProductMapContext): string {
   const outDir = join(generatedRoot, "web");
   const display = projectDisplay(model.journeys, model.effects);
   assertDisplayIncludesOtherSurface(display);
@@ -25,7 +26,7 @@ export function generateWeb(model: ReviewedModel, generatedRoot: string): string
   const journeyList = model.journeys
     .map((journey) => `<li><code>${escapeHtml(journey.id)}</code> ${escapeHtml(journey.name)}</li>`)
     .join("\n");
-  const proseHtml = renderProductMapProse(model)
+  const proseHtml = renderProductMapProse(model, extras)
     .split("\n")
     .map((line) => proseLineToHtml(line))
     .join("\n");

@@ -10,3 +10,4 @@ export * from "./lifecycle.js";
 export * from "./run-plan.js";
 export * from "./scope.js";
 export * from "./explanation.js";
+export * from "./control-candidates.js";

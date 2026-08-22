@@ -509,6 +509,13 @@ export interface Journey {
    * 仅由 applyHumanReview 的 addJourney / retarget 从 run-context.yaml 拷入；hydrateModel 不得发明。
    */
   entry_url?: string;
+  /**
+   * MAP-2 / MAP-7 / MAP-8。仅人类 annotate 写入。
+   * 引擎不得推断发送者/读者，不得写入单独的「用户」，hydrateModel 不得发明。
+   */
+  affected_parties?: string;
+  combinations?: string;
+  keep_reason?: string;
 }
 
 export interface Capability {

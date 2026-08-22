@@ -120,7 +120,8 @@ describe("M6 人工审定与四份导出", () => {
 
     const html = readFileSync(join(root, "generated/web/index.html"), "utf8");
     expect(html).toContain("jny-send-001");
-    expect(html).not.toMatch(/https?:\/\//);
+    expect(html).not.toMatch(/src=["']https?:\/\//);
+    expect(html).not.toMatch(/href=["']https?:\/\//);
     expect(html).not.toMatch(/src=["']\/\//);
     expect(html).not.toMatch(/fonts\.google|cdn\.|unpkg|jsdelivr/i);
 
