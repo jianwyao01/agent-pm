@@ -19,6 +19,7 @@
           "status": { "enum": ["accepted", "stale", "not_observed"] },
           "effect_ids": { "type": "array", "items": { "type": "string" } },
           "control_id": { "type": "string" },
+          "entry_url": { "type": "string", "minLength": 1 },
           "steps": {
             "type": "array",
             "items": {
