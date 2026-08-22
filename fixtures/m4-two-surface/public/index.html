@@ -18,17 +18,45 @@
           aria-label="打开已有目标 Surface"
           >打开目标面</a
         >
-        <a
-          href="/create"
+        <button
+          type="button"
           id="nav-open-create"
           data-action="click"
           data-seed="nav-open-create"
           data-control="nav-create-entry"
           data-scope-hint="打开创建面"
           aria-label="打开创建面"
-          >打开创建面</a
         >
+          打开创建面
+        </button>
       </nav>
+      <form
+        id="create-form"
+        hidden
+        data-action="submit"
+        data-seed="create-item"
+        data-scope-hint="提交创建"
+      >
+        <input
+          id="create-name"
+          name="name"
+          type="text"
+          data-action="type"
+          data-control="create-name"
+          aria-label="名称"
+        />
+        <button
+          type="submit"
+          id="control-create-submit"
+          data-action="submit"
+          data-seed="create-item"
+          data-control="control-create-submit"
+          data-scope-hint="提交创建"
+          aria-label="提交创建"
+        >
+          提交
+        </button>
+      </form>
       <ul id="created-nav" aria-label="已创建条目"></ul>
       <ul id="item-list" data-collection="list"></ul>
       <button
@@ -75,6 +103,24 @@
           .map((item) => `<li data-created-id="${item.id}">${item.name}</li>`)
           .join("");
       }
+      document.getElementById("nav-open-create").addEventListener("click", () => {
+        const form = document.getElementById("create-form");
+        form.hidden = false;
+        document.getElementById("create-name").focus();
+      });
+      document.getElementById("create-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const raw = document.getElementById("create-name").value;
+        const name = String(raw || "").trim() || "created-item";
+        await fetch("/create", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name })
+        });
+        document.getElementById("create-name").value = "";
+        await loadItems();
+        await loadCreated();
+      });
       loadItems();
       loadCreated();
     </script>

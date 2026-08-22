@@ -66,7 +66,7 @@ function writeCreateStudy(dir: string): Study {
     id: "study-new-item",
     name: "创建条目",
     goal: "打开创建面，填写名称并提交，观察导航与列表出现新项",
-    entry_seeds: ["nav-open-create"],
+    entry_seeds: ["nav-open-create", "/create"],
     include_hints: ["打开创建面", "名称", "提交创建"],
     exclude_hints: ["穷尽导航树", "发送一条消息", "管理后台", "话题串", "创建容器"],
     exploration_mode: "approved_probe"
@@ -254,7 +254,7 @@ describe("M8 创建面深化域", () => {
             name: "打开创建面",
             action: "click",
             binding_id: "bind-create-open",
-            locator: { kind: "role", value: "link;name=打开创建面", reliable: true }
+            locator: { kind: "role", value: "button;name=打开创建面", reliable: true }
           },
           {
             id: "ctl-name",
@@ -277,7 +277,7 @@ describe("M8 创建面深化域", () => {
       tmp("bm-m8-gen-")
     );
     expect(withUrl).toContain('page.goto("http://127.0.0.1:5555/")');
-    expect(withUrl).toContain("link;name=打开创建面");
+    expect(withUrl).toContain("button;name=打开创建面");
     expect(withUrl).toContain("textbox;name=名称");
     expect(withUrl).toContain("button;name=提交创建");
     expect(withUrl).not.toContain("about:blank");
@@ -368,7 +368,7 @@ describe("M8 创建面深化域", () => {
     expect(nameField).toBeTruthy();
     expect(submitCreate).toBeTruthy();
 
-    const openLocator = { type: "role" as const, value: "link;name=打开创建面" };
+    const openLocator = { type: "role" as const, value: "button;name=打开创建面" };
     const nameLocator = { type: "role" as const, value: "textbox;name=名称" };
     const submitLocator = { type: "role" as const, value: "button;name=提交创建" };
     writeJsonl(join(runRoot, "bindings.jsonl"), [
@@ -461,7 +461,7 @@ describe("M8 创建面深化域", () => {
     expect(openAt).toBeGreaterThan(-1);
     expect(nameAt).toBeGreaterThan(openAt);
     expect(submitAt).toBeGreaterThan(nameAt);
-    expect(spec).toMatch(/getByRole\("link".*name:\s*"打开创建面"/);
+    expect(spec).toMatch(/getByRole\("button".*name:\s*"打开创建面"/);
     expect(spec).toMatch(/getByRole\("textbox".*name:\s*"名称"/);
     expect(spec).toMatch(/getByRole\("button".*name:\s*"提交创建"/);
     expect(spec).toMatch(/\.fill\(/);
