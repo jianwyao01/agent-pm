@@ -83,7 +83,8 @@ export function actualBackendFrom(requests: CapturedRequest[], pageUrl: string):
     const path = safePath(request.url);
     return path !== "/health" && !isStaticAsset(path);
   });
-  const last = interesting.at(-1);
+  const mutating = interesting.filter((request) => request.method !== "GET");
+  const last = mutating.at(-1) ?? interesting.at(-1);
   if (!last) {
     return undefined;
   }
