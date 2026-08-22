@@ -5,13 +5,19 @@ import {
   UNOBSERVED,
   loadReviewedModel,
   markMissingSupport,
+  probePlanActions,
   readJson,
+  readYaml,
+  validateDocument,
   writeYaml,
+  type Binding,
   type Candidate,
   type Capability,
   type Effect,
   type Journey,
+  type JourneyStep,
   type ObservationKind,
+  type ProbePlan,
   type Proposal,
   type ProposedEffect,
   type ProposedJourney,
@@ -20,7 +26,7 @@ import {
   type Transport
 } from "@behavior-map/contracts";
 import { effectIdFor, nextJourneyId } from "./ids.js";
-import { controlIdFrom, hydrateModel, loadRunCandidates } from "./hydrate.js";
+import { controlIdFrom, hydrateModel, loadRunBindings, loadRunCandidates } from "./hydrate.js";
 
 export interface KeepJourneySpec {
   proposed_name: string;
@@ -47,14 +53,21 @@ export interface AddedJourneySpec {
   effect_ids?: string[];
 }
 
+export interface RetargetSpec {
+  journey_id: string;
+  control_id: string;
+}
+
 /**
  * 人类审定输入。可 keep / reject / rename，并可补录一条其认为有效的旅程。
+ * retarget 必须显式给出；hydrateModel 不得发明重定位。
  */
 export interface HumanReviewSpec {
   keep?: KeepJourneySpec[];
   reject?: RejectSpec[];
   rename?: RenameSpec[];
   addJourney?: AddedJourneySpec;
+  retarget?: RetargetSpec[];
 }
 
 export interface ApplyHumanReviewOptions {
@@ -86,6 +99,8 @@ export function applyHumanReview(options: ApplyHumanReviewOptions): ReviewedMode
   const existing = loadReviewedModel(analysisRoot);
   const modelExisted = existsSync(join(analysisRoot, "model", "journeys.yaml"));
   const candidates = loadRunCandidates(analysisRoot, runId);
+  const bindings = loadRunBindings(analysisRoot, runId);
+  const probePlan = loadStudyProbePlan(analysisRoot);
   const proposals = loadRunProposals(analysisRoot, runId);
   const proposedJourneys = proposals.flatMap((item) => item.proposed_journeys);
   const proposedEffects = proposals.flatMap((item) => item.proposed_effects);
@@ -107,7 +122,8 @@ export function applyHumanReview(options: ApplyHumanReviewOptions): ReviewedMode
       journeys,
       effects,
       decisions,
-      capabilities
+      capabilities,
+      probePlan
     });
   }
 
@@ -120,7 +136,11 @@ export function applyHumanReview(options: ApplyHumanReviewOptions): ReviewedMode
   }
 
   if (spec.addJourney) {
-    applyAddJourney(spec.addJourney, journeys, decisions, capabilities, effects);
+    applyAddJourney(spec.addJourney, journeys, decisions, capabilities, effects, probePlan);
+  }
+
+  for (const retarget of spec.retarget ?? []) {
+    applyRetarget(retarget, journeys, bindings, probePlan);
   }
 
   const observedIds = observedJourneyIds(journeys, candidates, proposedJourneys);
@@ -186,6 +206,7 @@ function applyKeep(input: {
   effects: Effect[];
   decisions: ReviewDecision[];
   capabilities: Capability[];
+  probePlan?: ProbePlan;
 }): void {
   const proposed = input.proposedJourneys.find((item) => item.name === input.keep.proposed_name);
   if (!proposed) {
@@ -234,7 +255,8 @@ function applyKeep(input: {
     name,
     status: "accepted",
     effect_ids: effectIds,
-    control_id: control
+    control_id: control,
+    ...stepsField(input.probePlan)
   });
   if (primaryCandidate) {
     input.decisions.push({
@@ -298,7 +320,8 @@ function applyAddJourney(
   journeys: Journey[],
   decisions: ReviewDecision[],
   capabilities: Capability[],
-  effects: Effect[]
+  effects: Effect[],
+  probePlan?: ProbePlan
 ): void {
   const existingAdded = decisions.find((item) => item.candidate_id.startsWith("human-added:"));
   if (existingAdded?.journey_id) {
@@ -314,7 +337,8 @@ function applyAddJourney(
     name: added.name,
     status: "accepted",
     effect_ids: effectIds,
-    control_id: added.control_id
+    control_id: added.control_id,
+    ...stepsField(probePlan)
   });
   decisions.push({
     candidate_id: `human-added:${journeyId}`,
@@ -322,6 +346,56 @@ function applyAddJourney(
     journey_id: journeyId
   });
   ensureSendCapability(capabilities, added.control_id);
+}
+
+function applyRetarget(
+  spec: RetargetSpec,
+  journeys: Journey[],
+  bindings: Binding[],
+  probePlan?: ProbePlan
+): void {
+  const journey = journeys.find((item) => item.id === spec.journey_id);
+  if (!journey) {
+    throw new Error(`重定位失败：不存在旅程 ${spec.journey_id}`);
+  }
+  const human = bindings.find(
+    (row) => row.control_id === spec.control_id && row.approved_by === "human"
+  );
+  if (!human) {
+    throw new Error(
+      `重定位失败：control_id ${spec.control_id} 在本 run 的 bindings.jsonl 中没有 approved_by human 的绑定`
+    );
+  }
+  journey.control_id = spec.control_id;
+  const steps = stepsFromProbePlan(probePlan);
+  if (steps) {
+    journey.steps = steps;
+  }
+}
+
+function stepsFromProbePlan(plan?: ProbePlan): JourneyStep[] | undefined {
+  if (!plan) {
+    return undefined;
+  }
+  return probePlanActions(plan);
+}
+
+function stepsField(plan?: ProbePlan): { steps: JourneyStep[] } | Record<string, never> {
+  const steps = stepsFromProbePlan(plan);
+  return steps ? { steps } : {};
+}
+
+function loadStudyProbePlan(analysisRoot: string): ProbePlan | undefined {
+  const file = join(analysisRoot, "probe-plan.yaml");
+  if (!existsSync(file)) {
+    return undefined;
+  }
+  const data = readYaml<ProbePlan>(file);
+  const report = validateDocument("probe-plan", data, file);
+  if (!report.ok) {
+    throw new Error(report.issues.map((issue) => issue.message).join("; "));
+  }
+  return data;
 }
 
 function mergeEffects(

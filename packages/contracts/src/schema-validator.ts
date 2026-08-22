@@ -5,7 +5,9 @@ import Ajv from "ajv";
 import type { ErrorObject, ValidateFunction } from "ajv";
 import addFormats from "ajv-formats";
 import { readJson, readJsonl, readYaml } from "./io.js";
+import { validateProbePlanRules } from "./probe-plan.js";
 import { validateRunPlanShape } from "./run-plan.js";
+import type { ProbePlan } from "./types.js";
 
 const schemaDir = join(dirname(fileURLToPath(import.meta.url)), "schemas");
 
@@ -149,6 +151,11 @@ export function validateDocument(kind: FileKind, data: unknown, path = "<memory>
         path: issue.path ? `${path}#${issue.path}` : path,
         message: issue.message
       });
+    }
+  }
+  if (kind === "probe-plan" && data && typeof data === "object") {
+    for (const message of validateProbePlanRules(data as ProbePlan)) {
+      issues.push({ kind, path, message });
     }
   }
   return { ok: issues.length === 0, issues };

@@ -2,6 +2,7 @@ export * from "./types.js";
 export * from "./interfaces.js";
 export * from "./ids.js";
 export * from "./io.js";
+export * from "./probe-plan.js";
 export * from "./schema-validator.js";
 export * from "./semantic-validator.js";
 export * from "./display.js";
