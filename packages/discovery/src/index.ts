@@ -5,4 +5,8 @@ export { usableProject } from "./project-guard.js";
 export { loadProbePlan, loadStudy } from "./runtime.js";
 export { createContext, resolveStorageStatePath } from "./session-provider.js";
 export { loadBindings, loadControls } from "./store.js";
-export { parseApprovedLocator } from "./observe.js";
+export {
+  APPROVED_LOCATOR_VISIBLE_TIMEOUT_MS,
+  parseApprovedLocator,
+  waitForApprovedVisible
+} from "./observe.js";
