@@ -47,4 +47,16 @@ export class StubDiscoveryAdapter implements DiscoveryAdapter {
       cross_actor: { executed: false, display_value: CROSS_ACTOR_UNEXECUTED }
     };
   }
+
+  async play(
+    project: DiscoveryProjectInput,
+    context: RunContext,
+    actions: Control[]
+  ): Promise<ActionObservation[]> {
+    if (actions.length === 0) {
+      return [];
+    }
+    const first = await this.execute(project, context, actions[0]);
+    return [first];
+  }
 }

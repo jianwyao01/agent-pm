@@ -12,6 +12,7 @@ import type {
 import { CROSS_ACTOR_UNEXECUTED } from "@behavior-map/contracts";
 import { usableProject, refusedGap } from "./project-guard.js";
 import { scanWorkspace, type ScanOptions } from "./scan.js";
+import { playActions } from "./probe-runner.js";
 import { executeAction, exploreRuntime, type RuntimeOptions } from "./runtime.js";
 
 export interface DiscoveryAdapterOptions extends ScanOptions, RuntimeOptions {
@@ -77,6 +78,32 @@ export class DefaultDiscoveryAdapter implements DiscoveryAdapter {
       exclude_hints: []
     };
     return executeAction(running, context, action, scope, this.runtimeOptions());
+  }
+
+  async play(
+    project: DiscoveryProjectInput,
+    context: RunContext,
+    actions: Control[]
+  ): Promise<ActionObservation[]> {
+    const running = usableProject(project);
+    if (!running) {
+      return [
+        {
+          status: "refused",
+          observations: [],
+          evidence: [],
+          candidates: [],
+          gaps: [refusedGap()],
+          cross_actor: { executed: false, display_value: CROSS_ACTOR_UNEXECUTED }
+        }
+      ];
+    }
+    const scope = this.lastScope ?? {
+      id: this.options.runId ?? "scope-discovery",
+      include_hints: [],
+      exclude_hints: []
+    };
+    return playActions(running, context, actions, scope, this.runtimeOptions());
   }
 
   private runtimeOptions(): RuntimeOptions {

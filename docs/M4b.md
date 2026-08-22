@@ -47,6 +47,8 @@ Will 于 2026-08-22 锁定。本里程碑只补 **页面事实控件、人类绑
 
 导航完成后、执行 `click` | `type` | `submit` 之前，replay **只**等待这一条 `approved_locator` 变为可见（有限超时）。超时即 `locator_not_found` / not visible 并停止，这是失败而不是继续搜索：不改用其他 locator、不点最后一个按钮、不试 submit、不打开登录页。
 
+一次 Probe 序列走 `DiscoveryAdapter.play`（内部 ProbeRunner 模块，不是第五套接口）：打开**一个** SessionProvider context，storageState / cookies 只注入一次，首次导航后沿用同一 page，再按序对每个 `action.binding_id` 调用既有 execute 内部实现。孤立 `execute()` 仍可为单步测试开独立浏览器；Probe 序列不得每步新开浏览器，否则现场 SPA 上已输入的撰写框会丢、Send 保持禁用。
+
 若 binding 缺失、locator 找不到、或控件不可见：`status` 为 `failed`（该联合类型已锁定，不用新增值），`reason` 为 `binding_missing` | `locator_not_found`。**停止**。
 
 禁止：回退选择器、语义猜测、AI 重试、点最后一个按钮、试 submit、夹具默认 `#control-send`。
