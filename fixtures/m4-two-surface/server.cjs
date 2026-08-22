@@ -128,6 +128,66 @@ function lateComposePage() {
 `;
 }
 
+// 现场 SPA：Send 在撰写框为空时禁用。两次独立浏览器会丢掉已输入文本。
+function liveComposePage() {
+  return `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>现场撰写面</title>
+  </head>
+  <body>
+    <main id="surface-target" data-surface="surface-target" data-role="current" aria-label="撰写面">
+      <h1>现场撰写面</h1>
+      <form id="send-form">
+        <textarea id="compose-input" name="text" aria-label="输入"></textarea>
+        <button type="submit" id="control-send" aria-label="发送一条消息" disabled>发送</button>
+      </form>
+      <p id="status"></p>
+      <ul id="item-list" data-collection="list"></ul>
+    </main>
+    <script>
+      const input = document.getElementById("compose-input");
+      const send = document.getElementById("control-send");
+      function syncSend() {
+        send.disabled = !String(input.value || "").trim();
+      }
+      input.addEventListener("input", syncSend);
+      syncSend();
+
+      async function loadItems() {
+        const res = await fetch("/api/items");
+        const items = await res.json();
+        const ul = document.getElementById("item-list");
+        if (!ul) {
+          return;
+        }
+        ul.innerHTML = items
+          .map((item) => "<li data-item-id=\\"" + item.id + "\\">" + item.text + "</li>")
+          .join("");
+      }
+
+      document.getElementById("send-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const text = String(input.value || "").trim();
+        if (!text || send.disabled) {
+          return;
+        }
+        await fetch("/send", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text })
+        });
+        document.getElementById("status").textContent = "已发送: " + text;
+        await loadItems();
+      });
+      loadItems();
+    </script>
+  </body>
+</html>
+`;
+}
+
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -203,6 +263,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/compose-late" || url.pathname === "/compose-late.html") {
     sendHtml(res, lateComposePage());
+    return;
+  }
+  if (url.pathname === "/compose-live" || url.pathname === "/compose-live.html") {
+    sendHtml(res, liveComposePage());
     return;
   }
   res.writeHead(404);

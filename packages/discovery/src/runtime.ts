@@ -146,12 +146,21 @@ export async function exploreRuntime(
   }
 }
 
+/** click | type | submit 的有限超时；超时记 execute_failed，不改搜。 */
+export const DECLARED_ACTION_TIMEOUT_MS = 10_000;
+
+export function pageHasNavigated(session: DriverSession): boolean {
+  const url = session.page.url();
+  return url.startsWith("http://") || url.startsWith("https://");
+}
+
 export async function executeAction(
   project: RunningProject,
   context: RunContext,
   action: Control,
   scope: Scope,
-  options: RuntimeOptions
+  options: RuntimeOptions,
+  shared?: DriverSession
 ): Promise<ActionObservation> {
   const workspacePath = workspaceFromProject(project, options.workspacePath);
   if (!workspacePath) {
@@ -182,12 +191,15 @@ export async function executeAction(
   }
 
   const probe = loadProbePlan(workspacePath);
-  const session = await openSession(context, options);
+  const ownsSession = !shared;
+  const session = shared ?? (await openSession(context, options));
   const evidence: EvidenceRecord[] = [];
   const observations: Observation[] = [];
   try {
     const entryUrl = context.entry_url || project.base_url;
-    await session.page.goto(entryUrl, { waitUntil: "domcontentloaded" });
+    if (!pageHasNavigated(session)) {
+      await session.page.goto(entryUrl, { waitUntil: "domcontentloaded" });
+    }
     const listBefore = await readCollection(session);
     const locator = await waitForApprovedVisible(session.page, binding.approved_locator);
     if (!locator) {
@@ -335,7 +347,9 @@ export async function executeAction(
       cross_actor: CROSS_ACTOR
     };
   } finally {
-    await closeSession(session);
+    if (ownsSession) {
+      await closeSession(session);
+    }
   }
 }
 
@@ -368,11 +382,11 @@ async function performDeclared(
 ): Promise<void> {
   const kind = action.trim().toLowerCase();
   if (kind === "type") {
-    await locator.fill(value ?? "");
+    await locator.fill(value ?? "", { timeout: DECLARED_ACTION_TIMEOUT_MS });
     return;
   }
   if (kind === "submit" || kind === "click" || kind === "send") {
-    await locator.click();
+    await locator.click({ timeout: DECLARED_ACTION_TIMEOUT_MS });
     return;
   }
   throw new Error(`unsupported declared action: ${action}`);

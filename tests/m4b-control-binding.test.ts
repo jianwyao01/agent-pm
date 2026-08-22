@@ -22,7 +22,7 @@ import {
   twoSurfacePlan,
   workspaceAt
 } from "./helpers/two-surface.js";
-import { boundSubmitAction, writeHumanBinding, writeStorageState } from "./helpers/m4b-session.js";
+import { boundSubmitAction, boundTypeAction, writeHumanBinding, writeStorageState } from "./helpers/m4b-session.js";
 
 function tmp(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -258,6 +258,89 @@ describe("M4b Control / Binding / SessionProvider", () => {
     const loginPosted = await fetch(`http://127.0.0.1:${appPort}/debug/login-posted`).then((res) => res.json());
     expect(loginPosted.posted).toBe(false);
   }, 60_000);
+
+  it("一次 Probe 的 type+submit 共用同一浏览器；缺 binding / 永不出现仍立即停止", async () => {
+    const dir = tmp("bm-m4b-play-");
+    const sessionDir = tmp("bm-m4b-play-session-");
+    copyTwoSurfaceFixture(dir);
+    writeTrusted(dir);
+    const depPort = await reservePort();
+    const appPort = await reservePort();
+    const plan = twoSurfacePlan({
+      runId: "run-m4b-play",
+      depPort,
+      appPort,
+      confirmation: { status: "confirmed", confirmed_at: "2026-08-22T00:00:00.000Z" }
+    });
+    writePlanFile(dir, plan);
+    const storageState = join(sessionDir, "storageState.json");
+    writeStorageState(storageState);
+
+    const discovery = new DefaultDiscoveryAdapter({
+      runId: "run-m4b-play",
+      analysisRoot: dir,
+      sessionRefs: { "secret:session-cookie": storageState }
+    });
+    const scope = fixtureScope(dir);
+    await discovery.scan(workspaceAt(dir), scope);
+
+    const startedResult = await projectAdapter.start(workspaceAt(dir), plan);
+    const project = toSuccess(startedResult);
+    started.push(project);
+
+    const liveContext = fixtureContext(dir, `http://127.0.0.1:${appPort}/compose-live`);
+    const missing = await discovery.play(project, liveContext, [
+      {
+        id: "ctl-live-send",
+        surface_id: "surface-target",
+        name: "发送一条消息",
+        action: "submit"
+      }
+    ]);
+    expect(["failed", "unreachable"]).toContain(missing[0]?.status);
+    expect(missing[0]?.gaps.some((gap) => gap.reason === "binding_missing")).toBe(true);
+
+    const runRoot = join(dir, "runs", "run-m4b-play");
+    const typeBinding = writeHumanBinding(runRoot, {
+      binding_id: "bind-live-type",
+      control_id: "ctl-live-input",
+      approved_locator: { type: "role", value: "textbox;name=输入" }
+    });
+    const sendBinding = {
+      schema_version: SCHEMA_VERSION,
+      binding_id: "bind-live-send",
+      control_id: "ctl-live-send",
+      approved_locator: { type: "role" as const, value: "button;name=发送一条消息" },
+      approved_by: "human" as const,
+      created_at: "2026-08-22T00:00:00.000Z"
+    };
+    writeJsonl(join(runRoot, "bindings.jsonl"), [typeBinding, sendBinding]);
+
+    const neverContext = fixtureContext(dir, `http://127.0.0.1:${appPort}/compose-late?paint=never`);
+    const missed = await discovery.play(project, neverContext, [boundSubmitAction(sendBinding)]);
+    expect(["failed", "unreachable"]).toContain(missed[0]?.status);
+    expect(missed[0]?.gaps.some((gap) => gap.reason === "locator_not_found")).toBe(true);
+
+    const itemsBefore = (await fetch(`http://127.0.0.1:${appPort}/api/items`).then((res) =>
+      res.json()
+    )) as Array<{ text: string }>;
+    const unique = `probe-shared-${Date.now().toString(36)}`;
+    const played = await discovery.play(project, liveContext, [
+      boundTypeAction(typeBinding, unique),
+      boundSubmitAction(sendBinding)
+    ]);
+    expect(played).toHaveLength(2);
+    expect(played.every((row) => row.status === "success")).toBe(true);
+
+    const itemsAfter = (await fetch(`http://127.0.0.1:${appPort}/api/items`).then((res) =>
+      res.json()
+    )) as Array<{ text: string }>;
+    expect(itemsAfter.length).toBeGreaterThan(itemsBefore.length);
+    expect(itemsAfter.some((item) => item.text.includes(unique))).toBe(true);
+
+    const loginPosted = await fetch(`http://127.0.0.1:${appPort}/debug/login-posted`).then((res) => res.json());
+    expect(loginPosted.posted).toBe(false);
+  }, 70_000);
 
   it("packages/ 不把 Rocket.Chat / Room / Channel 当核心类型，也不写死产品选择器", () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), "..");

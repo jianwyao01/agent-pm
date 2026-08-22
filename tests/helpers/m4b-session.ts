@@ -49,13 +49,21 @@ export function writeHumanBinding(
   return row;
 }
 
-export function boundSubmitAction(binding: Binding, extras: Partial<Control> = {}): Control {
+export function boundAction(binding: Binding, extras: Partial<Control> = {}): Control {
   return {
-    id: binding.control_id,
+    id: extras.id ?? binding.control_id,
     surface_id: extras.surface_id ?? "surface-target",
     name: extras.name ?? "发送一条消息",
     action: extras.action ?? "submit",
     binding_id: binding.binding_id,
     ...extras
   };
+}
+
+export function boundSubmitAction(binding: Binding, extras: Partial<Control> = {}): Control {
+  return boundAction(binding, { action: "submit", ...extras });
+}
+
+export function boundTypeAction(binding: Binding, value: string, extras: Partial<Control> = {}): Control {
+  return boundAction(binding, { action: "type", name: extras.name ?? "输入", value, ...extras });
 }

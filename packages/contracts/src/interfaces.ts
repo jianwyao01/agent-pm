@@ -21,7 +21,7 @@ import type {
 /**
  * 四接口。M1 实现 SourceProvider（git + local；archive 接口保留未交付）。
  * M2 实现 ProjectAdapter.detect / createRunPlan；M3 实现 start / stop。
- * M4 实现 DiscoveryAdapter.scan / explore / execute。
+ * M4 实现 DiscoveryAdapter.scan / explore / execute；M4b 增加 play（Probe 序列共用会话，不是第五套接口）。
  * M5 实现真实 AgentRunner（DefaultAgentRunner）；Mock 仍用于合约测试。
  * M6 实现人工审定 model/ 与四份导出函数（不是第五套接口）。
  * boot / discovery 只消费 Workspace + SourceSnapshot，不得依赖 source.kind。
@@ -65,6 +65,15 @@ export interface DiscoveryAdapter {
     context: RunContext,
     action: Control
   ): Promise<ActionObservation>;
+  /**
+   * 一次 Probe 序列：共用一个 SessionProvider context，首次导航后沿用同一 page。
+   * 不是第五套接口。孤立 execute() 仍可开独立浏览器做单步测试。
+   */
+  play(
+    project: DiscoveryProjectInput,
+    context: RunContext,
+    actions: Control[]
+  ): Promise<ActionObservation[]>;
 }
 
 export interface AgentRunner {
