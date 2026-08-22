@@ -114,6 +114,10 @@ const server = http.createServer(async (req, res) => {
     sendFile(res, path.join(publicDir, "compose.html"), "text/html; charset=utf-8");
     return;
   }
+  if (url.pathname === "/compose-late" || url.pathname === "/compose-late.html") {
+    sendFile(res, path.join(publicDir, "compose-late.html"), "text/html; charset=utf-8");
+    return;
+  }
   res.writeHead(404);
   res.end("not found");
 });

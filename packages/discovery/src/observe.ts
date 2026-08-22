@@ -188,6 +188,9 @@ export async function collectProbeUrls(
   return [...urls];
 }
 
+/** execute 只等这一条 approved_locator 可见；超时即失败，不改搜。 */
+export const APPROVED_LOCATOR_VISIBLE_TIMEOUT_MS = 10_000;
+
 export function locateApproved(page: Page, approved: ApprovedLocator): Locator {
   const parsed = parseApprovedLocator(approved);
   if (!parsed?.role) {
@@ -196,6 +199,24 @@ export function locateApproved(page: Page, approved: ApprovedLocator): Locator {
   return parsed.name
     ? page.getByRole(parsed.role as "button", { name: parsed.name, exact: true })
     : page.getByRole(parsed.role as "button");
+}
+
+/**
+ * 导航后、click|type|submit 前：只等这一条 approved_locator 变为可见。
+ * 超时返回 undefined，调用方必须 locator_not_found 并停止。
+ */
+export async function waitForApprovedVisible(
+  page: Page,
+  approved: ApprovedLocator,
+  timeoutMs = APPROVED_LOCATOR_VISIBLE_TIMEOUT_MS
+): Promise<Locator | undefined> {
+  const locator = locateApproved(page, approved);
+  try {
+    await locator.first().waitFor({ state: "visible", timeout: timeoutMs });
+    return locator;
+  } catch {
+    return undefined;
+  }
 }
 
 export function isPhase1ApprovedLocator(approved: ApprovedLocator): boolean {

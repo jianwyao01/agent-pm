@@ -195,6 +195,66 @@ describe("M4b Control / Binding / SessionProvider", () => {
     expect(semantic.issues.filter((issue) => issue.code === "generated_locator_mismatch")).toEqual([]);
   }, 50_000);
 
+  it("execute 等待 approved_locator 可见后才重放；永不出现则 locator_not_found，不回退", async () => {
+    const dir = tmp("bm-m4b-late-");
+    const sessionDir = tmp("bm-m4b-late-session-");
+    copyTwoSurfaceFixture(dir);
+    writeTrusted(dir);
+    const depPort = await reservePort();
+    const appPort = await reservePort();
+    const plan = twoSurfacePlan({
+      runId: "run-m4b-late",
+      depPort,
+      appPort,
+      confirmation: { status: "confirmed", confirmed_at: "2026-08-22T00:00:00.000Z" }
+    });
+    writePlanFile(dir, plan);
+    const storageState = join(sessionDir, "storageState.json");
+    writeStorageState(storageState);
+
+    const discovery = new DefaultDiscoveryAdapter({
+      runId: "run-m4b-late",
+      analysisRoot: dir,
+      sessionRefs: { "secret:session-cookie": storageState }
+    });
+    const scope = fixtureScope(dir);
+    await discovery.scan(workspaceAt(dir), scope);
+
+    const startedResult = await projectAdapter.start(workspaceAt(dir), plan);
+    const project = toSuccess(startedResult);
+    started.push(project);
+
+    const runRoot = join(dir, "runs", "run-m4b-late");
+    const binding = writeHumanBinding(runRoot, {
+      binding_id: "bind-late-send",
+      control_id: "ctl-late-send",
+      approved_locator: { type: "role", value: "button;name=发送一条消息" }
+    });
+
+    const itemsBefore = await fetch(`http://127.0.0.1:${appPort}/api/items`).then((res) => res.json());
+    expect(itemsBefore).toHaveLength(1);
+
+    const lateContext = fixtureContext(dir, `http://127.0.0.1:${appPort}/compose-late?delay=500`);
+    const executed = await discovery.execute(project, lateContext, boundSubmitAction(binding));
+    expect(executed.status).toBe("success");
+
+    const itemsAfterWait = await fetch(`http://127.0.0.1:${appPort}/api/items`).then((res) => res.json());
+    expect(itemsAfterWait.length).toBeGreaterThan(itemsBefore.length);
+    expect(itemsAfterWait.some((item) => String(item.text).includes("decoy-fallback"))).toBe(false);
+
+    const neverContext = fixtureContext(dir, `http://127.0.0.1:${appPort}/compose-late?paint=never`);
+    const missed = await discovery.execute(project, neverContext, boundSubmitAction(binding));
+    expect(["failed", "unreachable"]).toContain(missed.status);
+    expect(missed.gaps.some((gap) => gap.reason === "locator_not_found")).toBe(true);
+
+    const itemsAfterMiss = await fetch(`http://127.0.0.1:${appPort}/api/items`).then((res) => res.json());
+    expect(itemsAfterMiss).toHaveLength(itemsAfterWait.length);
+    expect(itemsAfterMiss.some((item) => String(item.text).includes("decoy-fallback"))).toBe(false);
+
+    const loginPosted = await fetch(`http://127.0.0.1:${appPort}/debug/login-posted`).then((res) => res.json());
+    expect(loginPosted.posted).toBe(false);
+  }, 60_000);
+
   it("packages/ 不把 Rocket.Chat / Room / Channel 当核心类型，也不写死产品选择器", () => {
     const root = join(dirname(fileURLToPath(import.meta.url)), "..");
     const packages = join(root, "packages");

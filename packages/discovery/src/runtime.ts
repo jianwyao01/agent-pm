@@ -27,7 +27,7 @@ import {
   collectProbeUrls,
   dumpVisibleControls,
   isPhase1ApprovedLocator,
-  locateApproved
+  waitForApprovedVisible
 } from "./observe.js";
 import { loadBindings, loadCandidates, persistMerged, resolveRunRoot } from "./store.js";
 import { listScanFiles, resolveSnapshotId } from "./snapshot.js";
@@ -189,10 +189,8 @@ export async function executeAction(
     const entryUrl = context.entry_url || project.base_url;
     await session.page.goto(entryUrl, { waitUntil: "domcontentloaded" });
     const listBefore = await readCollection(session);
-    const locator = locateApproved(session.page, binding.approved_locator);
-    const found = await locator.count();
-    const visible = found > 0 ? await locator.first().isVisible().catch(() => false) : false;
-    if (found === 0 || !visible) {
+    const locator = await waitForApprovedVisible(session.page, binding.approved_locator);
+    if (!locator) {
       const miss = evidenceRecord("runtime-execute", {
         binding_id: binding.binding_id,
         reason: "locator_not_found",

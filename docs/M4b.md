@@ -45,6 +45,8 @@ Will 于 2026-08-22 锁定。本里程碑只补 **页面事实控件、人类绑
 3. 执行声明的 `click` | `type` | `submit`。
 4. 写 Observation。
 
+导航完成后、执行 `click` | `type` | `submit` 之前，replay **只**等待这一条 `approved_locator` 变为可见（有限超时）。超时即 `locator_not_found` / not visible 并停止，这是失败而不是继续搜索：不改用其他 locator、不点最后一个按钮、不试 submit、不打开登录页。
+
 若 binding 缺失、locator 找不到、或控件不可见：`status` 为 `failed`（该联合类型已锁定，不用新增值），`reason` 为 `binding_missing` | `locator_not_found`。**停止**。
 
 禁止：回退选择器、语义猜测、AI 重试、点最后一个按钮、试 submit、夹具默认 `#control-send`。
