@@ -69,6 +69,8 @@ export interface ConfirmEffectSpec {
   journey_id: string;
   effect_id: string;
   evidence_ref: string;
+  /** 人类点名的可见项。有非空值时直接写入 observation.display_value。 */
+  display_value?: string;
 }
 
 /**
@@ -482,7 +484,8 @@ function applyConfirmEffect(
   if (!record) {
     throw new Error(`确认效果失败：本 run 没有 evidence_ref ${spec.evidence_ref}`);
   }
-  const display = displayValueFromEvidence(record);
+  const named = spec.display_value?.trim();
+  const display = named ? named : displayValueFromEvidence(record);
   effect.observation.observed = true;
   effect.observation.display_value = display;
   if (!effect.observation.evidence_refs.includes(spec.evidence_ref)) {
@@ -495,7 +498,7 @@ function applyConfirmEffect(
 
 function displayValueFromEvidence(record: EvidenceRecord): string {
   const payload = record.payload ?? {};
-  for (const key of ["name", "text", "label", "item", "display_value", "title"] as const) {
+  for (const key of ["name", "label", "item", "title"] as const) {
     const value = payload[key];
     if (typeof value === "string" && value.trim()) {
       return value.trim();

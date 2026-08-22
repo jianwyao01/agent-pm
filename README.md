@@ -91,7 +91,7 @@
 
 ### M9
 - `HumanReviewSpec.confirmEffects` 只确认已有六列槽位与本 run 已有 evidence；人类确认，禁止猜测
-- `applyHumanReview` 翻转该槽位 `observed`，`display_value` 取自具名 evidence，不插入第二行 collection
+- `applyHumanReview` 翻转该槽位 `observed`；可选 `display_value` 由人类点名，否则只从 payload `name` / `label` / `item` / `title` / `delta` / `list_after` 推导，不用 `payload.text`
 - `hydrateModel` 不发明 observation；`generateAll` 在该列写 `观察到`
 - `play` 用 role+name / listitem / link name 记页上可见项，不再刮夹具 CSS
 - 首次证明用已有 evidence，本里程碑不做现场 RC play

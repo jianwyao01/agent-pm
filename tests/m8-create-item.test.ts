@@ -959,4 +959,71 @@ describe("M8 创建面深化域", () => {
       })
     ).toThrow(/确认效果失败/);
   });
+
+  it("只有长 payload.text 的 evidence 硬失败；补上 display_value 后写入名称且 observed", () => {
+    const dir = tmp("bm-m9-text-");
+    writeCreateStudy(dir);
+    writeCreateProbePlan(dir, "item-alpha");
+    writeLiveRunContext(dir, "http://127.0.0.1:4950/");
+    writeJsonl(join(dir, "runs", "run-m9-text", "bindings.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        binding_id: "bind-create-submit",
+        control_id: "ctl-create-submit",
+        approved_locator: { type: "role", value: "button;name=提交创建" },
+        approved_by: "human",
+        created_at: "2026-08-22T00:00:00.000Z"
+      }
+    ]);
+    writeJsonl(join(dir, "runs", "run-m9-text", "evidence", "runtime.jsonl"), [
+      {
+        schema_version: SCHEMA_VERSION,
+        id: "ev-page-dump",
+        immutable: true,
+        source: "runtime",
+        kind: "runtime-other",
+        payload: {
+          text: "列表面 打开目标面 打开创建面 名称 提交 已有条目 管理后台 话题串 swipe 一整页倾倒文本"
+        }
+      }
+    ]);
+    applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m9-text",
+      spec: {
+        addJourney: [{ journey_id: CREATE_JOURNEY_ID, control_id: "ctl-create-submit", name: "创建条目" }]
+      }
+    });
+
+    expect(() =>
+      applyHumanReview({
+        analysisRoot: dir,
+        runId: "run-m9-text",
+        spec: {
+          confirmEffects: [
+            { journey_id: CREATE_JOURNEY_ID, effect_id: LIST_EFFECT_ID, evidence_ref: "ev-page-dump" }
+          ]
+        }
+      })
+    ).toThrow(/确认效果失败/);
+
+    const confirmed = applyHumanReview({
+      analysisRoot: dir,
+      runId: "run-m9-text",
+      spec: {
+        confirmEffects: [
+          {
+            journey_id: CREATE_JOURNEY_ID,
+            effect_id: LIST_EFFECT_ID,
+            evidence_ref: "ev-page-dump",
+            display_value: "item-alpha"
+          }
+        ]
+      }
+    });
+    const list = confirmed.effects.find((item) => item.id === LIST_EFFECT_ID);
+    expect(list?.observation.observed).toBe(true);
+    expect(list?.observation.display_value).toBe("item-alpha");
+    expect(list?.observation.evidence_refs).toContain("ev-page-dump");
+  });
 });
