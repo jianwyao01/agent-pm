@@ -2,7 +2,7 @@
 
 通用产品行为分析器。核心对象是 **Surface / Control / Journey / Observation**，不绑定任何聊天或代码托管产品。
 
-> **当前：M0 合约 + Mock，M1 Source 快照（git / local），M2 detect + plan + scope，M3 多组件 start/stop，M4 Discovery scan/explore/execute + 一次 Probe 发送，M4b Control / Binding / SessionProvider（execute 只重放人类 locator），M5 真实 AgentRunner（事后 classify / prune），M6 人工审定模型 + 四份导出，M6b 官方闭环（ProbePlan.actions + 官方 play + 官方 retarget + generateAll），M7 官方 study runner（runClosedLoop + 夹具树入口），M8 创建面深化域（Journey.entry_url + 可指定 journey_id 的 addJourney + 夹具创建入口），M8b 审定观察与能力不再焊发送，M8c retarget 重映射残留能力名且导出标题跟随旅程，M9 人类确认列表效果，以及 M14 collection 刮取不得拖死已成功的 play 点击。**  
+> **当前：M0 合约 + Mock，M1 Source 快照（git / local），M2 detect + plan + scope，M3 多组件 start/stop，M4 Discovery scan/explore/execute + 一次 Probe 发送，M4b Control / Binding / SessionProvider（execute 只重放人类 locator），M5 真实 AgentRunner（事后 classify / prune），M6 人工审定模型 + 四份导出，M6b 官方闭环（ProbePlan.actions + 官方 play + 官方 retarget + generateAll），M7 官方 study runner（runClosedLoop + 夹具树入口），M8 创建面深化域（Journey.entry_url + 可指定 journey_id 的 addJourney + 夹具创建入口），M8b 审定观察与能力不再焊发送，M8c retarget 重映射残留能力名且导出标题跟随旅程，M9 人类确认列表效果，M14 collection 刮取不得拖死已成功的 play 点击，以及 M16 官方 dump 把 title 与 aria-label 记为 locator 候选。**  
 > 这不是 Rocket.Chat 级验收。产品级 RC 证明（真实发送上的 MAP）是后续在操作者 Linux 机器上、用户将该仓库标为 trusted 并提供会话之后的可信运行，**不是 CI**。  
 > CI 使用微型本地进程与双 Surface 夹具，不需要 LLM API key，也不需要外网。不宣传对未信任目标的安全执行。不声称目标应用 CI 变绿。
 
@@ -101,13 +101,18 @@
 - collection 仍用 role+name / listitem / link name；每条短超时、跳过脱离节点、限制数量
 - 刮取错误记观察缺口；已完成的人类动作保持 `success`
 
+### M16
+- `dumpVisibleControls` 在节点存在 `title` 或 `aria-label` 时写入对应 locator 候选；`observed.name` 仍是无障碍名，即使它是字形
+- 人类 Binding 可批准一条 `title` 或 `label`（aria-label）候选；`execute` / `play` 只等这一条，不回退，不把 name 改写成 title
+- 夹具仅图标按钮带 `title=Open item`，play 点击为 success
+
 ## 尚未交付
 
 - Effect DAG / Reconciler / 能力注册表 / Worker / Broker
 - 在 CI 中克隆任何真实产品仓库
 - 产品级 Rocket.Chat 发送上的 MAP（操作者机器上的后续可信运行）
 
-详见 [docs/M0.md](docs/M0.md)、[docs/M1.md](docs/M1.md)、[docs/M2.md](docs/M2.md)、[docs/M3.md](docs/M3.md)、[docs/M4.md](docs/M4.md)、[docs/M4b.md](docs/M4b.md)、[docs/M5.md](docs/M5.md)、[docs/M6.md](docs/M6.md)、[docs/M6b.md](docs/M6b.md)、[docs/M7.md](docs/M7.md)、[docs/M8.md](docs/M8.md)、[docs/M8b.md](docs/M8b.md)、[docs/M8c.md](docs/M8c.md)、[docs/M9.md](docs/M9.md) 与 [docs/M14.md](docs/M14.md)。
+详见 [docs/M0.md](docs/M0.md)、[docs/M1.md](docs/M1.md)、[docs/M2.md](docs/M2.md)、[docs/M3.md](docs/M3.md)、[docs/M4.md](docs/M4.md)、[docs/M4b.md](docs/M4b.md)、[docs/M5.md](docs/M5.md)、[docs/M6.md](docs/M6.md)、[docs/M6b.md](docs/M6b.md)、[docs/M7.md](docs/M7.md)、[docs/M8.md](docs/M8.md)、[docs/M8b.md](docs/M8b.md)、[docs/M8c.md](docs/M8c.md)、[docs/M9.md](docs/M9.md)、[docs/M14.md](docs/M14.md) 与 [docs/M16.md](docs/M16.md)。
 
 ## 目录
 

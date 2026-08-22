@@ -435,6 +435,7 @@ export type LocatorCandidateType =
   | "accessibility"
   | "role"
   | "label"
+  | "title"
   | "text"
   | "css"
   | "xpath";
@@ -461,8 +462,8 @@ export interface ObservedControl {
   evidence_refs: string[];
 }
 
-/** Phase-1 approved_locator 只能是 accessibility 或 role+name。 */
-export type ApprovedLocatorType = "accessibility" | "role";
+/** 人类批准的 locator：accessibility / role+name，以及节点上已有的 title / aria-label（label）。 */
+export type ApprovedLocatorType = "accessibility" | "role" | "title" | "label";
 
 export interface ApprovedLocator {
   type: ApprovedLocatorType;

@@ -16,6 +16,8 @@ export interface DumpedNode {
   placeholder: string;
   value: string;
   label: string;
+  title: string;
+  ariaLabel: string;
   text: string;
   id: string;
   href: string;
@@ -108,6 +110,8 @@ export async function dumpVisibleControls(
           placeholder: el.getAttribute("placeholder") ?? "",
           value: "value" in el ? String((el as HTMLInputElement).value ?? "") : "",
           label: (el.getAttribute("aria-label") || labelFromId || String(labelFor)).trim().slice(0, 80),
+          title: (el.getAttribute("title") ?? "").replace(/\s+/g, " ").trim().slice(0, 80),
+          ariaLabel: (el.getAttribute("aria-label") ?? "").replace(/\s+/g, " ").trim().slice(0, 80),
           text: (el.textContent ?? "").replace(/\s+/g, " ").trim().slice(0, 80),
           id: el.id ?? "",
           href: el.getAttribute("href") ?? "",
@@ -192,6 +196,12 @@ export async function collectProbeUrls(
 export const APPROVED_LOCATOR_VISIBLE_TIMEOUT_MS = 10_000;
 
 export function locateApproved(page: Page, approved: ApprovedLocator): Locator {
+  if (approved.type === "title") {
+    return page.getByTitle(approved.value.trim(), { exact: true });
+  }
+  if (approved.type === "label") {
+    return page.getByLabel(approved.value.trim(), { exact: true });
+  }
   const parsed = parseApprovedLocator(approved);
   if (!parsed?.role) {
     return page.locator(`[data-binding-invalid="${cssEscape(approved.value)}"]`);
@@ -220,6 +230,9 @@ export async function waitForApprovedVisible(
 }
 
 export function isPhase1ApprovedLocator(approved: ApprovedLocator): boolean {
+  if (approved.type === "title" || approved.type === "label") {
+    return approved.value.trim().length > 0;
+  }
   if (approved.type !== "accessibility" && approved.type !== "role") {
     return false;
   }
@@ -277,6 +290,12 @@ function locatorCandidatesFor(node: DumpedNode): LocatorCandidate[] {
     add("role", `${node.role};name=${node.name}`);
   } else if (node.role) {
     add("role", node.role);
+  }
+  if (node.ariaLabel) {
+    add("label", node.ariaLabel);
+  }
+  if (node.title) {
+    add("title", node.title);
   }
   if (node.label) {
     add("label", node.label);
